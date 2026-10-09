@@ -40,7 +40,9 @@ public class Board {
     private void calculateAdjacencies() {
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
-                if (grid[i][j].isMine) continue;
+                if (grid[i][j].isMine) {
+                    continue;
+                }
                 
                 int count = 0;
                 for (int di = -1; di <= 1; di++) {
