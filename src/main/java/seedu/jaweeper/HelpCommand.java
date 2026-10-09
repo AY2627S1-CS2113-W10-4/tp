@@ -17,6 +17,5 @@ public class HelpCommand extends Command {
         System.out.println("  u ROW COL  Remove a flag.");
         System.out.println("Coordinates: 1 to " + Board.SIZE + ", row first, then column.");
         System.out.println("Example: r 2 3");
-        System.out.println("The r/f/u commands require the team's gameplay implementations.");
     }
 }

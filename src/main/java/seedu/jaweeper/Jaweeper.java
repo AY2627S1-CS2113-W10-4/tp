@@ -24,13 +24,12 @@ public class Jaweeper {
     /**
      * Registers gameplay commands with zero-based row and column arguments.
      */
-    private static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands() {
+    static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands() {
         Map<String, BiFunction<Integer, Integer, Command>> commands = new HashMap<>();
 
-        // Enable each registration when the corresponding command class is available.
-        // commands.put("r", RevealCommand::new);
+        commands.put("r", RevealCommand::new);
         commands.put("f", FlagCommand::new);
-        // commands.put("u", UnflagCommand::new);
+        commands.put("u", UnflagCommand::new);
 
         return commands;
     }
