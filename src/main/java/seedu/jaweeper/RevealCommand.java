@@ -30,6 +30,12 @@ public class RevealCommand extends Command {
             // Tell Matthew's flood-fill to run here!
             board.floodFill(row, col);
             board.printBoard();
+
+            if (board.checkVictory()) {
+                System.out.println("========================");
+                System.out.println("        VICTORY!        ");
+                System.out.println("========================");
+            }
         }
     }
 }
