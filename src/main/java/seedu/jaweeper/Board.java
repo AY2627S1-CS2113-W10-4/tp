@@ -111,4 +111,15 @@ public class Board {
         }
         System.out.println(divider);
     }
+
+    public boolean checkVictory() {
+        for (Cell[] rowCells : grid) {
+            for (Cell cell : rowCells) {
+                if (!cell.isMine && !cell.isRevealed) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 }
