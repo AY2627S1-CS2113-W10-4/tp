@@ -29,7 +29,7 @@ public class Jaweeper {
 
         // Enable each registration when the corresponding command class is available.
         // commands.put("r", RevealCommand::new);
-        // commands.put("f", FlagCommand::new);
+        commands.put("f", FlagCommand::new);
         // commands.put("u", UnflagCommand::new);
 
         return commands;
