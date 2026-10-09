@@ -60,6 +60,41 @@ public class Board {
     }
 
     /**
+     * Recursively reveals blank cells (0 adjacent mines) and their surrounding neighbors.
+     */
+    public void floodFill(int row, int col) {
+        // Base case 1: Check bounds
+        if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) {
+            return;
+        }
+
+        Cell currentCell = grid[row][col];
+
+        // Base cases 2 & 3: Stop if already revealed or if it's a mine
+        if (currentCell.isRevealed || currentCell.isMine) {
+            return;
+        }
+
+        // Reveal the current cell
+        currentCell.isRevealed = true;
+
+        // If cell has numbers (>0 adjacent mines), stop expanding
+        if (currentCell.adjacentMines > 0) {
+            return;
+        }
+
+        // Recursively call floodFill on all 8 surrounding cells
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) {
+                    continue;
+                }
+                floodFill(row + dr, col + dc);
+            }
+        }
+    }
+
+    /**
      * Prints the current state of the board with grid coordinates and borders.
      */
     public void printBoard() {
