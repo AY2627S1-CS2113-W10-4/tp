@@ -6,9 +6,11 @@ import java.util.logging.Logger;
 public class Board {
     public static final int SIZE = 9;
     public static final int MINES = 10;
+    private static final Logger logger = Logger.getLogger(Board.class.getName());
     public Cell[][] grid;
 
-    private static final Logger logger = Logger.getLogger(Board.class.getName());
+
+
 
     public Board() {
         grid = new Cell[SIZE][SIZE];
