@@ -8,7 +8,6 @@ public class Board {
     public static final int MINES = 10;
     private static final Logger logger = Logger.getLogger(Board.class.getName());
     public Cell[][] grid;
-    private boolean areMinesPlaced = false;
 
     public Board() {
         grid = new Cell[SIZE][SIZE];
@@ -17,37 +16,25 @@ public class Board {
                 grid[i][j] = new Cell();
             }
         }
-        // Mines are NOT placed here anymore. They are deferred until the first click!
-        logger.info("New empty board initialized.");
+        placeMines();
+        calculateAdjacencies();
+        logger.info("New board initialized with 10 mines.");
     }
 
     /**
-     * Places mines and calculates adjacencies, ensuring the first clicked cell
-     * (and its neighbors) are safe.
+     * Randomly places 10 mines across the grid during initialization.
      */
-    public void ensureSafeFirstClick(int firstRow, int firstCol) {
-        if (areMinesPlaced) {
-            return;
-        }
-
+    private void placeMines() {
         Random rand = new Random();
         int minesPlaced = 0;
         while (minesPlaced < MINES) {
             int r = rand.nextInt(SIZE);
             int c = rand.nextInt(SIZE);
-
-            // Avoid placing a mine on the first clicked cell or its immediate neighbors
-            boolean isNearFirstClick = Math.abs(r - firstRow) <= 1 && Math.abs(c - firstCol) <= 1;
-
-            if (!isNearFirstClick && !grid[r][c].isMine) {
+            if (!grid[r][c].isMine) {
                 grid[r][c].isMine = true;
                 minesPlaced++;
             }
         }
-
-        calculateAdjacencies();
-        areMinesPlaced = true;
-        logger.info("Mines placed securely away from first click at (" + firstRow + ", " + firstCol + ").");
     }
 
     /**
