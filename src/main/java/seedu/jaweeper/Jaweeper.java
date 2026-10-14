@@ -4,11 +4,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Runs the Jaweeper command-line application.
  */
 public class Jaweeper {
+
+    private static final Logger LOGGER = Logger.getLogger(Jaweeper.class.getName());
 
     /**
      * Starts Jaweeper with a fresh board.
@@ -44,6 +48,7 @@ public class Jaweeper {
      */
     public static void run(Scanner input, Board board,
                            Map<String, BiFunction<Integer, Integer, Command>> coordinateCommands) {
+        LOGGER.info("Jaweeper session started");
         System.out.println("Welcome to Jaweeper! Type help for commands.");
         board.printBoard();
 
@@ -51,6 +56,7 @@ public class Jaweeper {
             System.out.print("> ");
 
             if (!input.hasNextLine()) {
+                LOGGER.info("Jaweeper session ended: end of input");
                 System.out.println("End of input. Goodbye!");
                 return;
             }
@@ -59,13 +65,17 @@ public class Jaweeper {
             try {
                 command = Parser.parse(input.nextLine(), coordinateCommands);
             } catch (IllegalArgumentException exception) {
+                LOGGER.fine("Rejected invalid command input");
                 System.out.println(exception.getMessage());
                 continue;
             }
 
+            LOGGER.log(Level.FINE, "Executing command: {0}", command.getClass().getSimpleName());
             command.execute(board);
+            LOGGER.log(Level.FINE, "Completed command: {0}", command.getClass().getSimpleName());
 
             if (command.isExit()) {
+                LOGGER.info("Jaweeper session ended: exit command");
                 return;
             }
         }
