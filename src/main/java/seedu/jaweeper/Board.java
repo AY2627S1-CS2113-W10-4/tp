@@ -260,6 +260,7 @@ public class Board {
         System.out.println("Safe Cells Remaining : " + remainingSafeCells);
         System.out.printf("Completion Progress  : %.2f%%\n", completion);
         System.out.println("--------------------------");
+    }
     public GameState getGameState() {
         return gameState;
     }
