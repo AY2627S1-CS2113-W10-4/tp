@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
-import java.util.logging.Level;
 
 /**
  * Runs the Jaweeper command-line application.
