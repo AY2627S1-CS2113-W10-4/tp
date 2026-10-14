@@ -23,6 +23,9 @@ public class RevealCommand extends Command {
             return;
         }
 
+        // Classic Minesweeper: the first reveal of a game is never a mine and opens a blank area.
+        board.ensureSafeFirstClick(row, col);
+
         if (target.isMine) {
             target.isRevealed = true;
             System.out.println("💥 BOOM! You hit a mine at (" + (row+1) + ", " + (col+1) + ").");
