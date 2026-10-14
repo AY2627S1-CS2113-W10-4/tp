@@ -1,6 +1,7 @@
 package seedu.jaweeper;
 
 import java.util.Random;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Board {
@@ -238,6 +239,8 @@ public class Board {
      * the number of revealed cells, placed flags, and remaining safe cells.
      */
     public void printGameStateSummary() {
+        logger.log(Level.INFO, "Generating game state summary for user.");
+        
         int revealedCount = 0;
         int flagCount = countFlags();
         
@@ -261,6 +264,7 @@ public class Board {
         System.out.printf("Completion Progress  : %.2f%%\n", completion);
         System.out.println("--------------------------");
     }
+
     public GameState getGameState() {
         return gameState;
     }
