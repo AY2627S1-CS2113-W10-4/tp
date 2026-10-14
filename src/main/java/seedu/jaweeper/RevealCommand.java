@@ -11,6 +11,8 @@ public class RevealCommand extends Command {
 
     @Override
     public void execute(Board board) {
+        board.ensureSafeFirstClick(row, col);
+
         Cell target = board.grid[row][col];
         
         if (target.isFlagged) {
