@@ -8,7 +8,8 @@ public class NewGameCommand extends Command {
     @Override
     public void execute(Board board) {
         // Preserve the Board reference while replacing its current grid.
-        board.grid = new Board().grid;
+        //board.grid = new Board().grid;
+        board.copyStateFrom(new Board());
         System.out.println("New game started.");
         board.printBoard();
     }
