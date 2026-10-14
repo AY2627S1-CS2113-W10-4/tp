@@ -18,7 +18,7 @@ public class RevealCommand extends Command {
             return;
         }
         
-        target.isRevealed = true;
+        //target.isRevealed = true;
 
         if (target.isMine) {
             System.out.println("💥 BOOM! You hit a mine at (" + (row+1) + ", " + (col+1) + ").");
