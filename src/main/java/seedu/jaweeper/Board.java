@@ -10,6 +10,10 @@ public class Board {
     public Cell[][] grid;
 
     public Board() {
+        assert SIZE > 0 : "Board size must be positive";
+        assert MINES > 0 && MINES < (SIZE * SIZE) : "Invalid number of mines";
+        
+        logger.info("Initializing board of size " + SIZE + "x" + SIZE);
         grid = new Cell[SIZE][SIZE];
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
@@ -18,13 +22,14 @@ public class Board {
         }
         placeMines();
         calculateAdjacencies();
-        logger.info("New board initialized with 10 mines.");
+        logger.info("Board initialization complete with " + MINES + " mines");
     }
 
     /**
      * Randomly places 10 mines across the grid during initialization.
      */
     private void placeMines() {
+        logger.info("Placing mines on the board");
         Random rand = new Random();
         int minesPlaced = 0;
         while (minesPlaced < MINES) {
@@ -35,12 +40,14 @@ public class Board {
                 minesPlaced++;
             }
         }
+        assert minesPlaced == MINES : "Exact number of mines must be placed";
     }
 
     /**
      * Calculates the number of adjacent mines for every safe cell.
      */
     private void calculateAdjacencies() {
+        logger.info("Calculating mine adjacencies for all cells");
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
                 if (grid[i][j].isMine) {
@@ -71,6 +78,7 @@ public class Board {
         }
 
         Cell currentCell = grid[row][col];
+        assert currentCell != null : "Cell in grid should not be null";
 
         if (currentCell.isRevealed || currentCell.isFlagged || currentCell.isMine) {
             return;
@@ -97,6 +105,7 @@ public class Board {
      * Prints the current state of the board with grid coordinates and borders.
      */
     public void printBoard() {
+        assert grid != null : "Grid must be initialized before printing";
         System.out.println("     1   2   3   4   5   6   7   8   9");
         String divider = "    +---+---+---+---+---+---+---+---+---+";
 
@@ -112,6 +121,7 @@ public class Board {
     }
 
     public boolean checkVictory() {
+        assert grid != null : "Grid must not be null when checking victory";
         for (Cell[] rowCells : grid) {
             for (Cell cell : rowCells) {
                 if (!cell.isMine && !cell.isRevealed) {
@@ -119,6 +129,7 @@ public class Board {
                 }
             }
         }
+        logger.info("Victory condition met!");
         return true;
     }
 }
