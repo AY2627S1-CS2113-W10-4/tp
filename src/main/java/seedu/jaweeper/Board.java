@@ -1,10 +1,12 @@
 package seedu.jaweeper;
 
 import java.util.Random;
+import java.util.logging.Logger;
 
 public class Board {
     public static final int SIZE = 9;
     public static final int MINES = 10;
+    private static final Logger logger = Logger.getLogger(Board.class.getName());
     public Cell[][] grid;
 
     public Board() {
@@ -16,6 +18,7 @@ public class Board {
         }
         placeMines();
         calculateAdjacencies();
+        logger.info("New board initialized with 10 mines.");
     }
 
     /**
@@ -43,7 +46,7 @@ public class Board {
                 if (grid[i][j].isMine) {
                     continue;
                 }
-                
+
                 int count = 0;
                 for (int di = -1; di <= 1; di++) {
                     for (int dj = -1; dj <= 1; dj++) {
@@ -63,27 +66,23 @@ public class Board {
      * Recursively reveals blank cells (0 adjacent mines) and their surrounding neighbors.
      */
     public void floodFill(int row, int col) {
-        // Base case 1: Check bounds
         if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) {
             return;
         }
 
         Cell currentCell = grid[row][col];
 
-        // Base cases 2 & 3: Stop if already revealed or if it's a mine
-        if (currentCell.isRevealed || currentCell.isMine) {
+        if (currentCell.isRevealed || currentCell.isFlagged || currentCell.isMine) {
             return;
         }
 
-        // Reveal the current cell
         currentCell.isRevealed = true;
+        logger.finer("Revealed cell at (" + row + ", " + col + ")");
 
-        // If cell has numbers (>0 adjacent mines), stop expanding
         if (currentCell.adjacentMines > 0) {
             return;
         }
 
-        // Recursively call floodFill on all 8 surrounding cells
         for (int dr = -1; dr <= 1; dr++) {
             for (int dc = -1; dc <= 1; dc++) {
                 if (dr == 0 && dc == 0) {
@@ -100,7 +99,7 @@ public class Board {
     public void printBoard() {
         System.out.println("     1   2   3   4   5   6   7   8   9");
         String divider = "    +---+---+---+---+---+---+---+---+---+";
-        
+
         for (int i = 0; i < SIZE; i++) {
             System.out.println(divider);
             System.out.print("  " + (i + 1) + " |");
