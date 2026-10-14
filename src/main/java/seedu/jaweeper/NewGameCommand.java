@@ -9,6 +9,7 @@ public class NewGameCommand extends Command {
     public void execute(Board board) {
         // Preserve the Board reference while replacing its current grid.
         board.grid = new Board().grid;
+        board.setGameState(GameState.IN_PROGRESS);
         System.out.println("New game started.");
         board.printBoard();
     }
