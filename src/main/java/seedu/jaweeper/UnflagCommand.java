@@ -11,6 +11,11 @@ public class UnflagCommand extends Command {
 
     @Override
     public void execute(Board board) {
+
+        if (board.isGameOver()) {
+            System.out.println("The game is over. Type 'new' to start a new game.");
+            return;
+        }
         if (row < 0 || row >= board.grid.length
                 || col < 0 || col >= board.grid[0].length) {
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is out of bounds.");
