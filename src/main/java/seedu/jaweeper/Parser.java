@@ -75,13 +75,19 @@ public class Parser {
         int row = parseCoordinate(words[1]);
         int column = parseCoordinate(words[2]);
 
+        // User input has already been validated and converted to array indices.
+        assert row >= 0 && row < Board.SIZE : "Validated row must be within the board";
+        assert column >= 0 && column < Board.SIZE : "Validated column must be within the board";
+
         BiFunction<Integer, Integer, Command> factory = coordinateCommands.get(name);
         if (factory == null) {
             throw new IllegalArgumentException(
                     "Command '" + name + "' is not integrated in this build yet.");
         }
 
-        return factory.apply(row, column);
+        Command command = factory.apply(row, column);
+        assert command != null : "Registered command factory must not return null";
+        return command;
     }
 
     /**
