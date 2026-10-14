@@ -11,6 +11,11 @@ public class RevealCommand extends Command {
 
     @Override
     public void execute(Board board) {
+
+        if(board.isGameOver()) {
+            System.out.println("Game is already over. Start a new game to continue playing.");
+            return;
+        }
         if (row < 0 || row >= Board.SIZE || col < 0 || col >= Board.SIZE) {
             System.out.println("Coordinates are out of bounds.");
             return;
@@ -25,6 +30,7 @@ public class RevealCommand extends Command {
 
         if (target.isMine) {
             target.isRevealed = true;
+            board.setGameState(GameState.LOST);
             System.out.println("💥 BOOM! You hit a mine at (" + (row+1) + ", " + (col+1) + ").");
             System.out.println("========================");
             System.out.println("       GAME OVER        ");
@@ -34,6 +40,7 @@ public class RevealCommand extends Command {
             board.printBoard();
 
             if (board.checkVictory()) {
+                board.setGameState(GameState.WON);
                 System.out.println("========================");
                 System.out.println("        VICTORY!        ");
                 System.out.println("========================");
