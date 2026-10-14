@@ -194,6 +194,73 @@ public class Board {
         return true;
     }
 
+    /**
+     * Counts the total number of flags currently placed on the board.
+     *
+     * @return The total number of flagged cells.
+     */
+    public int countFlags() {
+        int flagCount = 0;
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j] != null && grid[i][j].isFlagged) {
+                    flagCount++;
+                }
+            }
+        }
+        assert flagCount >= 0 : "Flag count cannot be negative";
+        return flagCount;
+    }
+
+    /**
+     * Calculates the percentage of safe cells that have been revealed.
+     *
+     * @return The percentage of completion as a double.
+     */
+    public double calculateCompletionPercentage() {
+        int revealedCount = 0;
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j] != null && grid[i][j].isRevealed && !grid[i][j].isMine) {
+                    revealedCount++;
+                }
+            }
+        }
+        int totalSafeCells = (SIZE * SIZE) - MINES;
+        if (totalSafeCells == 0) {
+            return 100.0;
+        }
+        return ((double) revealedCount / totalSafeCells) * 100.0;
+    }
+
+    /**
+     * Prints a real-time summary of the current game state, including
+     * the number of revealed cells, placed flags, and remaining safe cells.
+     */
+    public void printGameStateSummary() {
+        int revealedCount = 0;
+        int flagCount = countFlags();
+        
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j] != null && grid[i][j].isRevealed) {
+                    revealedCount++;
+                }
+            }
+        }
+        
+        int totalSafeCells = (SIZE * SIZE) - MINES;
+        int remainingSafeCells = totalSafeCells - revealedCount;
+        double completion = calculateCompletionPercentage();
+        
+        System.out.println("--- Game State Summary ---");
+        System.out.println("Total Mines on Board : " + MINES);
+        System.out.println("Active Flags Placed  : " + flagCount);
+        System.out.println("Safe Cells Revealed  : " + revealedCount + " / " + totalSafeCells);
+        System.out.println("Safe Cells Remaining : " + remainingSafeCells);
+        System.out.printf("Completion Progress  : %.2f%%\n", completion);
+        System.out.println("--------------------------");
+    }
     public GameState getGameState() {
         return gameState;
     }

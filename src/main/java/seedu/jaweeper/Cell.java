@@ -8,6 +8,8 @@ public class Cell {
     
     /**
      * Returns the string representation of the cell based on its current state.
+     * 
+     * @return A string icon representing the cell.
      */
     public String getIcon() {
         if (isFlagged) {
@@ -23,5 +25,32 @@ public class Cell {
             return " ";
         }
         return String.valueOf(adjacentMines);
+    }
+
+    /**
+     * Checks if the current cell contains a mine.
+     * 
+     * @return true if the cell is a mine, false otherwise.
+     */
+    public boolean isMine() {
+        return isMine;
+    }
+
+    /**
+     * Checks if the current cell has been revealed by the player.
+     * 
+     * @return true if the cell is revealed, false otherwise.
+     */
+    public boolean isRevealed() {
+        return isRevealed;
+    }
+
+    /**
+     * Checks if the current cell has been flagged by the player.
+     * 
+     * @return true if the cell is flagged, false otherwise.
+     */
+    public boolean isFlagged() {
+        return isFlagged;
     }
 }
