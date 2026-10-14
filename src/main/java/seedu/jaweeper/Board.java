@@ -8,6 +8,7 @@ public class Board {
     public static final int MINES = 10;
     private static final Logger logger = Logger.getLogger(Board.class.getName());
     public Cell[][] grid;
+    private GameState gameState = GameState.IN_PROGRESS;
 
     private boolean isFirstMove = true;
 
@@ -191,5 +192,17 @@ public class Board {
             }
         }
         return true;
+    }
+
+    public GameState getGameState() {
+        return gameState;
+    }
+
+    public void setGameState(GameState gameState) {
+        this.gameState = gameState;
+    }
+
+    public boolean isGameOver() {
+        return gameState == GameState.WON || gameState == GameState.LOST;
     }
 }
