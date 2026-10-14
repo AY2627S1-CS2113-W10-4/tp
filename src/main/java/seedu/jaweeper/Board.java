@@ -2,15 +2,12 @@ package seedu.jaweeper;
 
 import java.util.Random;
 import java.util.logging.Logger;
-import java.util.logging.Level;
 
 public class Board {
     public static final int SIZE = 9;
     public static final int MINES = 10;
     public Cell[][] grid;
-    private boolean areMinesPlaced = false;
 
-    // Logging instance
     private static final Logger logger = Logger.getLogger(Board.class.getName());
 
     public Board() {
@@ -20,43 +17,36 @@ public class Board {
                 grid[i][j] = new Cell();
             }
         }
-        // Note: We no longer place mines here immediately.
-        // We wait for the first click to ensure a safe start!
-        logger.info("New board initialized without mines.");
+        // ==========================================
+        // Fix 1: Restored immediate mine placement
+        // as Unit tests expect a newly constructed board
+        // to immediately contain 10 mines, not 0.
+        // ==========================================
+        placeMines();
+        calculateAdjacencies();
+        logger.info("New board initialized with 10 mines.");
     }
 
     /**
-     * Randomly places 10 mines across the grid, avoiding the initial click and its 3x3 neighbors
-     * to guarantee a safe, expansive first click.
+     * Randomly places 10 mines across the grid during initialization.
      */
-    private void placeMinesAvoiding(int safeRow, int safeCol) {
-        assert !areMinesPlaced : "Mines should only be placed once.";
+    private void placeMines() {
         Random rand = new Random();
         int minesPlaced = 0;
-
         while (minesPlaced < MINES) {
             int r = rand.nextInt(SIZE);
             int c = rand.nextInt(SIZE);
-
-            // Avoid placing a mine on or immediately around the first clicked cell
-            if (Math.abs(r - safeRow) <= 1 && Math.abs(c - safeCol) <= 1) {
-                continue;
-            }
-
             if (!grid[r][c].isMine) {
                 grid[r][c].isMine = true;
                 minesPlaced++;
             }
         }
-        areMinesPlaced = true;
-        logger.info("Mines successfully placed, avoiding (" + safeRow + ", " + safeCol + ").");
     }
 
     /**
      * Calculates the number of adjacent mines for every safe cell.
      */
     private void calculateAdjacencies() {
-        assert areMinesPlaced : "Cannot calculate adjacencies before mines are placed.";
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
                 if (grid[i][j].isMine) {
@@ -76,26 +66,17 @@ public class Board {
                 grid[i][j].adjacentMines = count;
             }
         }
-        logger.fine("Adjacency counts calculated for all cells.");
     }
 
     /**
      * Recursively reveals blank cells (0 adjacent mines) and their surrounding neighbors.
-     * Automatically triggers safe mine placement on the very first move.
      */
     public void floodFill(int row, int col) {
-        // Assertions for input bounds validation
-        assert row >= 0 && row < SIZE : "Row index out of bounds: " + row;
-        assert col >= 0 && col < SIZE : "Column index out of bounds: " + col;
-
-        // Lazy initialization: place mines on the first move ensuring the clicked spot is safe
-        if (!areMinesPlaced) {
-            logger.info("First move detected at (" + row + ", " + col + "). Initializing mines...");
-            placeMinesAvoiding(row, col);
-            calculateAdjacencies();
-        }
-
-        // Base case 1: Check bounds
+        // ==========================================
+        // Fix 2: Replaced assert with a standard if-check
+        // for Passing out-of-bounds indices like -1
+        // should return without throwing an AssertionError.
+        // ==========================================
         if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) {
             return;
         }
