@@ -48,6 +48,10 @@ public class Jaweeper {
      */
     public static void run(Scanner input, Board board,
                            Map<String, BiFunction<Integer, Integer, Command>> coordinateCommands) {
+        assert input != null : "Scanner input must not be null";
+        assert board != null : "Board must not be null";
+        assert coordinateCommands != null : "Coordinate commands map must not be null";
+
         LOGGER.info("Jaweeper session started");
         System.out.println("Welcome to Jaweeper! Type help for commands.");
         board.printBoard();
@@ -69,6 +73,8 @@ public class Jaweeper {
                 System.out.println(exception.getMessage());
                 continue;
             }
+
+            assert command != null : "Parsed command should not be null";
 
             LOGGER.log(Level.FINE, "Executing command: {0}", command.getClass().getSimpleName());
             command.execute(board);
