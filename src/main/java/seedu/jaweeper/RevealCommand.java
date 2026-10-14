@@ -42,6 +42,9 @@ public class RevealCommand extends Command {
         Cell target = board.grid[row][col];
         assert target != null : "Cell in grid must not be null";
 
+        // Classic Minesweeper: the first reveal of a game is never a mine and opens a blank area.
+        board.ensureSafeFirstClick(row, col);
+
         if (target.isMine) {
             revealMine(board, target);
         } else {
