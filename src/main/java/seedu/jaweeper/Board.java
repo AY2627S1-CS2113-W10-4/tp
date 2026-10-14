@@ -12,7 +12,6 @@ public class Board {
     public Board() {
         assert SIZE > 0 : "Board size must be positive";
         assert MINES > 0 && MINES < (SIZE * SIZE) : "Invalid number of mines";
-        
         logger.info("Initializing board of size " + SIZE + "x" + SIZE);
         grid = new Cell[SIZE][SIZE];
         for (int i = 0; i < SIZE; i++) {
