@@ -23,6 +23,7 @@ public class FlagCommand extends Command {
         }
 
         Cell target = board.grid[row][col];
+
         if (target.isRevealed) {
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is already revealed.");
         } else if (target.isFlagged) {
@@ -31,9 +32,9 @@ public class FlagCommand extends Command {
             target.isFlagged = true;
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") flagged.");
         }
+
         board.printBoard();
-        // Todo: Write a method in Board called board.checkVictory()
-        // that loops through all cells. If all non-mine cells are revealed, print VICTORY!
+
     }
 }
 
