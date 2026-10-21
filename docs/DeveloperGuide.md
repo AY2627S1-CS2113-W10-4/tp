@@ -108,6 +108,11 @@ This foundation does not yet supply in-game profile create/select/rename/delete 
 
 See [the integration contract](ProfileIntegration.md) for the factory interface and ownership boundaries. Other team members should add their own implementation sections alongside this one.
 
+### Difficulty Levels and Dynamic Boards
+* The `Board` class was refactored to support dynamic dimensions, replacing the hardcoded 9x9 grid constants.
+* A new `Difficulty` enum manages the standard presets: EASY (9x9, 10 mines), MEDIUM (16x16, 40 mines), and HARD (16x30, 99 mines).
+* `Parser.java` and `NewGameCommand.java` were updated to route difficulty arguments (e.g., `new hard`) to generate the correct board.
+* The `copyStateFrom()` method allows the active `GameSession` to seamlessly adopt the new board dimensions without breaking the main game loop.
 
 ## Product scope
 ### Target user profile

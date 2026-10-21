@@ -26,15 +26,14 @@ public class FlagCommand extends Command {
             System.out.println("The game is over. Type 'new' to start a new game.");
             return;
         }
-        if (row < 0 || row >= board.grid.length
-                || col < 0 || col >= board.grid[0].length) {
+        if (row < 0 || row >= board.getRows() || col < 0 || col >= board.getCols()) {
             logger.log(Level.WARNING, "Flag rejected: (" + row + ", " + col + ") is out of bounds");
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is out of bounds.");
             return;
         }
 
-        assert row >= 0 && row < board.grid.length : "Row must be within the board after bounds check";
-        assert col >= 0 && col < board.grid[0].length : "Column must be within the board after bounds check";
+        assert row >= 0 && row < board.getRows() : "Row must be within the board after bounds check";
+        assert col >= 0 && col < board.getCols() : "Column must be within the board after bounds check";
 
         Cell target = board.grid[row][col];
         assert target != null : "Cell in grid must not be null";
@@ -54,13 +53,6 @@ public class FlagCommand extends Command {
         }
 
         board.printBoard();
-
     }
 }
-
-
-
-
-
-
 

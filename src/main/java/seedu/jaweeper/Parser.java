@@ -11,29 +11,15 @@ import java.util.function.Function;
  */
 public class Parser {
 
-    /**
-     * Parses a core command without gameplay command registrations.
-     */
     public static Command parse(String input) {
         return parse(input, Map.of());
     }
 
-    /**
-     * Parses input using registered gameplay command factories.
-     * Each factory receives a zero-based row and column, in that order.
-     */
     public static Command parse(String input,
                                 Map<String, BiFunction<Integer, Integer, Command>> coordinateCommands) {
-        return parse(input, coordinateCommands, Map.of(), Board.SIZE, Board.SIZE);
+        return parse(input, coordinateCommands, Map.of(), Difficulty.EASY.rows, Difficulty.EASY.cols);
     }
 
-    /**
-     * Parses commands using feature factories and the current board dimensions.
-     * Registry keys must be lowercase. A feature factory receives argument tokens
-     * without the command name; their original case is preserved. Feature factories
-     * take precedence over built-ins, allowing extensions such as new easy.
-     * Quoted arguments and semicolon-separated commands are not handled here.
-     */
     public static Command parse(String input,
                                 Map<String, BiFunction<Integer, Integer, Command>> coordinateCommands,
                                 Map<String, Function<String[], Command>> featureCommands,
@@ -63,8 +49,7 @@ public class Parser {
             requireNoArguments(words);
             return new ExitCommand();
         case "new":
-            requireNoArguments(words);
-            return new NewGameCommand();
+            return parseNewCommand(words);
         case "board":
             requireNoArguments(words);
             return new PrintBoardCommand();
@@ -78,9 +63,26 @@ public class Parser {
         }
     }
 
-    /**
-     * Rejects arguments supplied to a command that takes none.
-     */
+    private static Command parseNewCommand(String[] words) {
+        if (words.length == 1) {
+            return new NewGameCommand(Difficulty.EASY);
+        } else if (words.length == 2) {
+            String diffStr = words[1].toLowerCase(Locale.ROOT);
+            switch (diffStr) {
+            case "easy":
+                return new NewGameCommand(Difficulty.EASY);
+            case "medium":
+                return new NewGameCommand(Difficulty.MEDIUM);
+            case "hard":
+                return new NewGameCommand(Difficulty.HARD);
+            default:
+                throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+            }
+        } else {
+            throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+        }
+    }
+
     private static void requireNoArguments(String[] words) {
         if (words.length != 1) {
             throw new IllegalArgumentException(
@@ -88,9 +90,6 @@ public class Parser {
         }
     }
 
-    /**
-     * Checks coordinates and creates the corresponding gameplay command.
-     */
     private static Command parseCoordinates(String name, String[] words,
                                             Map<String, BiFunction<Integer, Integer, Command>> coordinateCommands,
                                             int rows, int columns) {
@@ -102,7 +101,6 @@ public class Parser {
         int row = parseCoordinate(words[1], rows);
         int column = parseCoordinate(words[2], columns);
 
-        // User input has already been validated and converted to array indices.
         assert row >= 0 && row < rows : "Validated row must be within the board";
         assert column >= 0 && column < columns : "Validated column must be within the board";
 
@@ -117,9 +115,6 @@ public class Parser {
         return command;
     }
 
-    /**
-     * Converts a one-based coordinate into a zero-based array index.
-     */
     private static int parseCoordinate(String value, int limit) {
         int coordinate;
 
