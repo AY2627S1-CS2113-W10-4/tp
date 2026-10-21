@@ -60,7 +60,7 @@ public class RevealCommand extends Command {
         if (board.isGameOver()) {
             throw new IllegalStateException("The game is over. Type 'new' to start a new game.");
         }
-        if (row < 0 || row >= Board.SIZE || col < 0 || col >= Board.SIZE) {
+        if (row < 0 || row >= board.getRows() || col < 0 || col >= board.getCols()) {
             throw new IllegalArgumentException("Coordinates are out of bounds.");
         }
         if (board.grid[row][col].isFlagged) {
@@ -79,7 +79,7 @@ public class RevealCommand extends Command {
         assert board.getGameState() == GameState.LOST : "Game should be lost after hitting a mine";
         logger.log(Level.INFO, "Mine hit at (" + row + ", " + col + "); game lost");
 
-        System.out.println("💥 BOOM! You hit a mine at (" + (row + 1) + ", " + (col + 1) + ").");
+        System.out.println("BOOM! You hit a mine at (" + (row + 1) + ", " + (col + 1) + ").");
         System.out.println("========================");
         System.out.println("       GAME OVER        ");
         System.out.println("========================");
@@ -107,3 +107,4 @@ public class RevealCommand extends Command {
         }
     }
 }
+

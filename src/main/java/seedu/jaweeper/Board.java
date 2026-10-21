@@ -5,52 +5,65 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Board {
-    public static final int SIZE = 9;
-    public static final int MINES = 10;
     private static final Logger logger = Logger.getLogger(Board.class.getName());
+    
+    @Deprecated
+    public static final int SIZE = 9;
+    @Deprecated
+    public static final int MINES = 10;
+    
+    private int rows;
+    private int cols;
+    private int totalMines;
+    
     public Cell[][] grid;
     private GameState gameState = GameState.IN_PROGRESS;
-
     private boolean isFirstMove = true;
 
     public Board() {
-        assert SIZE > 0 : "Board size must be positive";
-        assert MINES > 0 && MINES < (SIZE * SIZE) : "Invalid number of mines";
-        grid = new Cell[SIZE][SIZE];
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
+        this(Difficulty.EASY.rows, Difficulty.EASY.cols, Difficulty.EASY.mines);
+    }
+
+    public Board(int rows, int cols, int totalMines) {
+        this.rows = rows;
+        this.cols = cols;
+        this.totalMines = totalMines;
+        
+        assert rows > 0 && cols > 0 : "Board dimensions must be positive";
+        assert totalMines > 0 && totalMines < (rows * cols) : "Invalid number of mines";
+        
+        grid = new Cell[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
                 grid[i][j] = new Cell();
             }
         }
         placeMines();
         calculateAdjacencies();
-        logger.info("New board initialized with 10 mines.");
+        logger.info("New board initialized with " + totalMines + " mines.");
     }
 
     private void placeMines() {
         Random rand = new Random();
         int minesPlaced = 0;
-        while (minesPlaced < MINES) {
-            int r = rand.nextInt(SIZE);
-            int c = rand.nextInt(SIZE);
+        while (minesPlaced < totalMines) {
+            int r = rand.nextInt(rows);
+            int c = rand.nextInt(cols);
             if (!grid[r][c].isMine) {
                 grid[r][c].isMine = true;
                 minesPlaced++;
             }
         }
-        assert countMines() == MINES : "Board must contain exactly 10 mines!";
+        assert countMines() == totalMines : "Board must contain exactly " + totalMines + " mines!";
     }
 
     public boolean isFirstMove() {
         return isFirstMove;
     }
 
-    /**
-     * Ensures the first reveal of a game is safe, shifting mines out of the 3x3 safe area.
-     */
     public void ensureSafeFirstClick(int row, int col) {
-        assert row >= 0 && row < SIZE : "Row index out of bounds: " + row;
-        assert col >= 0 && col < SIZE : "Column index out of bounds: " + col;
+        assert row >= 0 && row < rows : "Row index out of bounds: " + row;
+        assert col >= 0 && col < cols : "Column index out of bounds: " + col;
 
         if (!isFirstMove) {
             return;
@@ -58,10 +71,10 @@ public class Board {
         isFirstMove = false;
 
         int minesBefore = countMines();
-
         int minesToMove = 0;
-        for (int r = 0; r < SIZE; r++) {
-            for (int c = 0; c < SIZE; c++) {
+        
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
                 if (isInSafeArea(r, c, row, col) && grid[r][c].isMine) {
                     grid[r][c].isMine = false;
                     minesToMove++;
@@ -71,8 +84,8 @@ public class Board {
 
         Random rand = new Random();
         while (minesToMove > 0) {
-            int r = rand.nextInt(SIZE);
-            int c = rand.nextInt(SIZE);
+            int r = rand.nextInt(rows);
+            int c = rand.nextInt(cols);
             if (!isInSafeArea(r, c, row, col) && !grid[r][c].isMine) {
                 grid[r][c].isMine = true;
                 minesToMove--;
@@ -92,9 +105,9 @@ public class Board {
 
     private int countMines() {
         int count = 0;
-        for (Cell[] rowCells : grid) {
-            for (Cell cell : rowCells) {
-                if (cell.isMine) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (grid[r][c].isMine) {
                     count++;
                 }
             }
@@ -104,16 +117,16 @@ public class Board {
 
     public void copyStateFrom(Board freshBoard) {
         assert freshBoard != null : "Board to copy from must not be null";
+        this.rows = freshBoard.rows;
+        this.cols = freshBoard.cols;
+        this.totalMines = freshBoard.totalMines;
         this.grid = freshBoard.grid;
         this.isFirstMove = freshBoard.isFirstMove;
     }
 
-    /**
-     * Calculates the number of adjacent mines for every safe cell.
-     */
     private void calculateAdjacencies() {
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
                 if (grid[i][j].isMine) {
                     continue;
                 }
@@ -123,7 +136,7 @@ public class Board {
                     for (int dj = -1; dj <= 1; dj++) {
                         int ni = i + di;
                         int nj = j + dj;
-                        if (ni >= 0 && ni < SIZE && nj >= 0 && nj < SIZE && grid[ni][nj].isMine) {
+                        if (ni >= 0 && ni < rows && nj >= 0 && nj < cols && grid[ni][nj].isMine) {
                             count++;
                         }
                     }
@@ -135,11 +148,8 @@ public class Board {
         }
     }
 
-    /**
-     * Recursively reveals blank cells (0 adjacent mines) and their surrounding neighbors.
-     */
     public void floodFill(int row, int col) {
-        if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) {
+        if (row < 0 || row >= rows || col < 0 || col >= cols) {
             return;
         }
 
@@ -166,17 +176,22 @@ public class Board {
         }
     }
 
-    /**
-     * Prints the current state of the board with grid coordinates and borders.
-     */
     public void printBoard() {
-        System.out.println("     1   2   3   4   5   6   7   8   9");
-        String divider = "    +---+---+---+---+---+---+---+---+---+";
-
-        for (int i = 0; i < SIZE; i++) {
+        int remainingMines = totalMines - countFlags();
+        System.out.println("Remaining Mines: " + remainingMines);
+        
+        System.out.print("    ");
+        for (int j = 0; j < cols; j++) {
+            System.out.printf(" %2d ", (j + 1));
+        }
+        System.out.println();
+        
+        String divider = "    +" + "---+".repeat(cols);
+        
+        for (int i = 0; i < rows; i++) {
             System.out.println(divider);
-            System.out.print("  " + (i + 1) + " |");
-            for (int j = 0; j < SIZE; j++) {
+            System.out.printf(" %2d |", (i + 1));
+            for (int j = 0; j < cols; j++) {
                 System.out.print(" " + grid[i][j].getIcon() + " |");
             }
             System.out.println();
@@ -185,9 +200,9 @@ public class Board {
     }
 
     public boolean checkVictory() {
-        for (Cell[] rowCells : grid) {
-            for (Cell cell : rowCells) {
-                if (!cell.isMine && !cell.isRevealed) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (!grid[r][c].isMine && !grid[r][c].isRevealed) {
                     return false;
                 }
             }
@@ -195,15 +210,10 @@ public class Board {
         return true;
     }
 
-    /**
-     * Counts the total number of flags currently placed on the board.
-     *
-     * @return The total number of flagged cells.
-     */
     public int countFlags() {
         int flagCount = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
                 if (grid[i][j] != null && grid[i][j].isFlagged) {
                     flagCount++;
                 }
@@ -213,51 +223,41 @@ public class Board {
         return flagCount;
     }
 
-    /**
-     * Calculates the percentage of safe cells that have been revealed.
-     *
-     * @return The percentage of completion as a double.
-     */
     public double calculateCompletionPercentage() {
         int revealedCount = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
                 if (grid[i][j] != null && grid[i][j].isRevealed && !grid[i][j].isMine) {
                     revealedCount++;
                 }
             }
         }
-        int totalSafeCells = (SIZE * SIZE) - MINES;
+        int totalSafeCells = (rows * cols) - totalMines;
         if (totalSafeCells == 0) {
             return 100.0;
         }
         return ((double) revealedCount / totalSafeCells) * 100.0;
     }
 
-    /**
-     * Prints a real-time summary of the current game state, including
-     * the number of revealed cells, placed flags, and remaining safe cells.
-     */
     public void printGameStateSummary() {
         logger.log(Level.INFO, "Generating game state summary for user.");
-        
         int revealedCount = 0;
         int flagCount = countFlags();
         
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
                 if (grid[i][j] != null && grid[i][j].isRevealed) {
                     revealedCount++;
                 }
             }
         }
         
-        int totalSafeCells = (SIZE * SIZE) - MINES;
+        int totalSafeCells = (rows * cols) - totalMines;
         int remainingSafeCells = totalSafeCells - revealedCount;
         double completion = calculateCompletionPercentage();
         
         System.out.println("--- Game State Summary ---");
-        System.out.println("Total Mines on Board : " + MINES);
+        System.out.println("Total Mines on Board : " + totalMines);
         System.out.println("Active Flags Placed  : " + flagCount);
         System.out.println("Safe Cells Revealed  : " + revealedCount + " / " + totalSafeCells);
         System.out.println("Safe Cells Remaining : " + remainingSafeCells);
@@ -275,5 +275,17 @@ public class Board {
 
     public boolean isGameOver() {
         return gameState == GameState.WON || gameState == GameState.LOST;
+    }
+
+    public int getRows() {
+        return rows;
+    }
+
+    public int getCols() {
+        return cols;
+    }
+
+    public int getTotalMines() {
+        return totalMines;
     }
 }
