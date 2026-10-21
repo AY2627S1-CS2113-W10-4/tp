@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="875" viewBox="0 0 1100 875" role="img" aria-labelledby="title">
+<title id="title">Sequence diagram for processing f 2 3</title>
+<defs>
+<marker id="open" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+<path d="M1,1 L9,5 L1,9" fill="none" stroke="#334155" stroke-width="1.5"/>
+</marker>
+<marker id="call" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#334155"/>
+</marker>
+</defs>
+<style>text{font-family:Arial,sans-serif;font-size:14px;fill:#172b43}.heading{font-size:19px;font-weight:bold}.name{font-size:16px;font-weight:bold}.small{font-size:12px}.line{fill:none;stroke:#334155;stroke-width:1.4}.dashed{stroke-dasharray:6 4}.life{stroke:#94a3b8;stroke-width:1.2;stroke-dasharray:6 5}.box{fill:#fff;stroke:#334155;stroke-width:1.4}.cap{fill:#eaf0f7}.active{fill:#edf2f7;stroke:#64748b;stroke-width:1}</style>
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="25" y="29" class="heading" >Command processing — successful f 2 3</text>
+<rect x="7" y="55" width="176" height="49" class="box"/>
+<path d="M95,104 V835" class="life"/>
+<text x="95" y="76" class="" text-anchor="middle">Jaweeper</text>
+<text x="95" y="94" class="small" text-anchor="middle">«static»</text>
+<rect x="217" y="55" width="176" height="49" class="box"/>
+<path d="M305,104 V835" class="life"/>
+<text x="305" y="85" class="" text-anchor="middle" text-decoration="underline">session:GameSession</text>
+<rect x="452" y="55" width="176" height="49" class="box"/>
+<path d="M540,104 V835" class="life"/>
+<text x="540" y="76" class="" text-anchor="middle">Parser</text>
+<text x="540" y="94" class="small" text-anchor="middle">«static»</text>
+<rect x="687" y="55" width="176" height="49" class="box"/>
+<path d="M775,104 V835" class="life"/>
+<text x="775" y="85" class="" text-anchor="middle" text-decoration="underline">flagFactory:BiFunction</text>
+<rect x="905" y="380" width="180" height="50" class="box"/>
+<text x="995" y="410" class="" text-anchor="middle" text-decoration="underline">cmd:FlagCommand</text>
+<path d="M995,430 V835" class="life"/>
+<rect x="90" y="116" width="10" height="700" class="active"/>
+<rect x="300" y="130" width="10" height="25" class="active"/>
+<rect x="300" y="185" width="10" height="25" class="active"/>
+<rect x="535" y="260" width="10" height="265" class="active"/>
+<rect x="770" y="345" width="10" height="145" class="active"/>
+<rect x="990" y="430" width="10" height="20" class="active"/>
+<rect x="300" y="565" width="10" height="30" class="active"/>
+<rect x="990" y="635" width="10" height="80" class="active"/>
+<rect x="990" y="750" width="10" height="35" class="active"/>
+<path d="M100,130 H300" class="line" marker-end="url(#call)"/>
+<text x="110" y="121" class="" >getRowCount()</text>
+<path d="M300,155 H100" class="line dashed" marker-end="url(#open)"/>
+<text x="110" y="146" class="" >rows</text>
+<path d="M100,185 H300" class="line" marker-end="url(#call)"/>
+<text x="110" y="176" class="" >getColumnCount()</text>
+<path d="M300,210 H100" class="line dashed" marker-end="url(#open)"/>
+<text x="110" y="201" class="" >columns</text>
+<path d="M100,260 H535" class="line" marker-end="url(#call)"/>
+<text x="110" y="251" class="" >parse("f 2 3", ..., rows, columns)</text>
+<path d="M545,295 H585 V322 H545" class="line" marker-end="url(#call)"/>
+<text x="555" y="285" class="small" >parseCoordinates(...)</text>
+<path d="M545,345 H770" class="line" marker-end="url(#call)"/>
+<text x="555" y="336" class="" >apply(1, 2)</text>
+<path d="M780,402 H905" class="line dashed" marker-end="url(#open)"/>
+<text x="786" y="372" class="small" >«create» (1, 2)</text>
+<path d="M990,450 H780" class="line dashed" marker-end="url(#open)"/>
+<text x="790" y="441" class="" >cmd</text>
+<path d="M770,490 H545" class="line dashed" marker-end="url(#open)"/>
+<text x="555" y="481" class="" >cmd</text>
+<path d="M535,525 H100" class="line dashed" marker-end="url(#open)"/>
+<text x="110" y="516" class="" >cmd</text>
+<path d="M100,565 H300" class="line" marker-end="url(#call)"/>
+<text x="110" y="556" class="" >getBoard()</text>
+<path d="M300,595 H100" class="line dashed" marker-end="url(#open)"/>
+<text x="110" y="586" class="" >board</text>
+<path d="M100,635 H990" class="line" marker-end="url(#call)"/>
+<text x="110" y="626" class="" >execute(board)</text>
+<rect x="720" y="657" width="252" height="35" fill="#fff8e6" stroke="#a18435"/>
+<text x="731" y="680" class="small" >Flagging internals omitted.</text>
+<path d="M990,715 H100" class="line dashed" marker-end="url(#open)"/>
+<path d="M100,750 H990" class="line" marker-end="url(#call)"/>
+<text x="110" y="741" class="" >isExit()</text>
+<path d="M990,785 H100" class="line dashed" marker-end="url(#open)"/>
+<text x="110" y="776" class="" >false</text>
+<text x="25" y="856" class="small" >Continue with the next input line. Scanner, logging and lambda adapter calls are omitted.</text>
+</svg>

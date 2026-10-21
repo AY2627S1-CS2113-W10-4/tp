@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="610" viewBox="0 0 1060 610" role="img" aria-labelledby="title">
+<title id="title">Profile component class diagram</title>
+<defs>
+<marker id="open" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+<path d="M1,1 L9,5 L1,9" fill="none" stroke="#334155" stroke-width="1.5"/>
+</marker>
+<marker id="call" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#334155"/>
+</marker>
+</defs>
+<style>text{font-family:Arial,sans-serif;font-size:14px;fill:#172b43}.heading{font-size:19px;font-weight:bold}.name{font-size:16px;font-weight:bold}.small{font-size:12px}.line{fill:none;stroke:#334155;stroke-width:1.4}.dashed{stroke-dasharray:6 4}.life{stroke:#94a3b8;stroke-width:1.2;stroke-dasharray:6 5}.box{fill:#fff;stroke:#334155;stroke-width:1.4}.cap{fill:#eaf0f7}.active{fill:#edf2f7;stroke:#64748b;stroke-width:1}</style>
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="30" y="30" class="heading" >Profile component — selected classes and members</text>
+<rect x="30" y="65" width="295" height="152" class="box"/>
+<rect x="31" y="66" width="293" height="37" class="cap"/>
+<text x="177.5" y="90" class="name" text-anchor="middle">GameSession</text>
+<path d="M30,104 H325" class="line"/>
+<text x="42" y="127" class="" >+ getBoard(): Board</text>
+<text x="42" y="152" class="" >+ getActiveProfile(): Profile</text>
+<text x="42" y="177" class="" >+ getProfileDirectory(): Path</text>
+<text x="42" y="202" class="" >+ replaceBoard(Board): void</text>
+<rect x="390" y="65" width="320" height="202" class="box"/>
+<rect x="391" y="66" width="318" height="37" class="cap"/>
+<text x="550" y="90" class="name" text-anchor="middle">ProfileManager</text>
+<path d="M390,104 H710" class="line"/>
+<text x="402" y="127" class="" >+ getProfiles(): List&lt;Profile&gt;</text>
+<text x="402" y="152" class="" >+ getActiveProfile(): Optional&lt;Profile&gt;</text>
+<text x="402" y="177" class="" >+ createProfile(String): Profile</text>
+<text x="402" y="202" class="" >+ selectProfile(String): Profile</text>
+<text x="402" y="227" class="" >+ renameProfile(String, String): Profile</text>
+<text x="402" y="252" class="" >+ deleteProfile(String): void</text>
+<rect x="770" y="65" width="260" height="102" class="box"/>
+<rect x="771" y="66" width="258" height="37" class="cap"/>
+<text x="900" y="90" class="name" text-anchor="middle">Storage</text>
+<path d="M770,104 H1030" class="line"/>
+<text x="782" y="127" class="" text-decoration="underline">+ readLines(Path): List&lt;String&gt;</text>
+<text x="782" y="152" class="" text-decoration="underline">+ writeLines(Path, List&lt;String&gt;): void</text>
+<rect x="30" y="390" width="295" height="77" class="box"/>
+<rect x="31" y="391" width="293" height="37" class="cap"/>
+<text x="177.5" y="415" class="name" text-anchor="middle">Board</text>
+<path d="M30,429 H325" class="line"/>
+<text x="42" y="452" class="" >+ grid: Cell[][]</text>
+<rect x="390" y="390" width="320" height="152" class="box"/>
+<rect x="391" y="391" width="318" height="37" class="cap"/>
+<text x="550" y="415" class="name" text-anchor="middle">Profile</text>
+<path d="M390,429 H710" class="line"/>
+<text x="402" y="452" class="" >- id: String {readOnly}</text>
+<text x="402" y="477" class="" >- name: String {readOnly}</text>
+<path d="M390,489 H710" class="line"/>
+<text x="402" y="502" class="" >+ getId(): String</text>
+<text x="402" y="527" class="" >+ getName(): String</text>
+<rect x="770" y="390" width="260" height="77" class="box"/>
+<rect x="771" y="391" width="258" height="37" class="cap"/>
+<text x="900" y="415" class="name" text-anchor="middle">ProfileStartup</text>
+<path d="M770,429 H1030" class="line"/>
+<text x="782" y="452" class="" text-decoration="underline">+ selectProfile(...): boolean</text>
+<path d="M325,150 H390" class="line" marker-end="url(#open)"/>
+<text x="336" y="137" class="small" >1</text>
+<text x="372" y="137" class="small" >1</text>
+<text x="327" y="174" class="small" >manager</text>
+<path d="M177,217 V390" class="line" marker-end="url(#open)"/>
+<text x="188" y="238" class="small" >1</text>
+<text x="188" y="377" class="small" >1</text>
+<text x="188" y="306" class="" >board</text>
+<path d="M550,267 V390" class="line" marker-end="url(#open)"/>
+<text x="562" y="290" class="small" >1</text>
+<text x="562" y="377" class="small" >0..*</text>
+<text x="562" y="335" class="" >profiles</text>
+<path d="M710,128 H770" class="line dashed" marker-end="url(#open)"/>
+<text x="723" y="115" class="small" >uses</text>
+<path d="M900,390 V320 H680 V267" class="line dashed" marker-end="url(#open)"/>
+<text x="802" y="308" class="small" >uses manager</text>
+<text x="30" y="580" class="small" >Solid arrows: retained references. Dashed arrows: dependencies. Underlined operations: static.</text>
+</svg>
