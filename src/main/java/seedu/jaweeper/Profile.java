@@ -9,6 +9,7 @@ public final class Profile {
 
     private final String id;
     private final String name;
+    private final Stats stats;
 
     /**
      * Constructs a profile using a canonical UUID and a validated display name.
@@ -19,6 +20,7 @@ public final class Profile {
         }
         this.id = id;
         this.name = validateName(name);
+        this.stats = new Stats();
     }
 
     /**
@@ -44,5 +46,9 @@ public final class Profile {
 
     public String getName() {
         return name;
+    }
+
+    public Stats getStats() {
+        return stats;
     }
 }

@@ -6,6 +6,23 @@
 
 ## Design & implementation
 
+### Statistics and Leaderboard Feature
+
+The statistics module tracks player performance metrics per profile, ensuring that personal scores are preserved independently across sessions.
+
+#### Architecture and Components
+- **`Stats` Model**: Maintains counts for wins, losses, current win streaks, maximum win streaks, and a historical list of completion times.
+- **`GameTimer`**: Records high-precision elapsed game duration using system timestamps (`System.currentTimeMillis()`), which is automatically triggered on game start and processed upon victory.
+- **Persistence**: Profile-specific statistics are serialized and stored independently under each player's designated directory (e.g., `data/profiles/<UUID>/stats.txt`) via the `Storage` subsystem.
+
+#### Command Summary & Syntax
+
+| Command | Format | Description | Example |
+| :--- | :--- | :--- | :--- |
+| **Stats** | `stats` | Displays performance metrics for the currently active profile (win rate, streaks, recent times). | `stats` |
+| **Stats Clear** | `stats clear` | Resets all recorded wins, losses, streaks, and times for the active profile. | `stats clear` |
+| **Leaderboard** | `leaderboard` | Compiles and ranks all registered profiles by win count and completion times. | `leaderboard` |
+
 ### Command processing and profile sessions
 
 **Maintainer:** Zack (zackyesten).

@@ -5,18 +5,21 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Board {
-    private static final Logger logger = Logger.getLogger(Board.class.getName());
-    
+    // 1. Public fields first
     @Deprecated
     public static final int SIZE = 9;
     @Deprecated
     public static final int MINES = 10;
-    
+
+    private static final Logger logger = Logger.getLogger(Board.class.getName());
+
+    public Cell[][] grid;
+
+    // 2. Private fields next
+
     private int rows;
     private int cols;
     private int totalMines;
-    
-    public Cell[][] grid;
     private GameState gameState = GameState.IN_PROGRESS;
     private boolean isFirstMove = true;
 
@@ -28,10 +31,10 @@ public class Board {
         this.rows = rows;
         this.cols = cols;
         this.totalMines = totalMines;
-        
+
         assert rows > 0 && cols > 0 : "Board dimensions must be positive";
         assert totalMines > 0 && totalMines < (rows * cols) : "Invalid number of mines";
-        
+
         grid = new Cell[rows][cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -72,7 +75,7 @@ public class Board {
 
         int minesBefore = countMines();
         int minesToMove = 0;
-        
+
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 if (isInSafeArea(r, c, row, col) && grid[r][c].isMine) {
@@ -120,8 +123,22 @@ public class Board {
         this.rows = freshBoard.rows;
         this.cols = freshBoard.cols;
         this.totalMines = freshBoard.totalMines;
-        this.grid = freshBoard.grid;
+        this.gameState = freshBoard.gameState;
         this.isFirstMove = freshBoard.isFirstMove;
+
+        // Perform a deep copy of the grid cells so test assertions match correctly
+        this.grid = new Cell[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                Cell source = freshBoard.grid[r][c];
+                Cell copy = new Cell();
+                copy.isMine = source.isMine;
+                copy.isRevealed = source.isRevealed;
+                copy.isFlagged = source.isFlagged;
+                copy.adjacentMines = source.adjacentMines;
+                this.grid[r][c] = copy;
+            }
+        }
     }
 
     private void calculateAdjacencies() {
@@ -178,16 +195,17 @@ public class Board {
 
     public void printBoard() {
         int remainingMines = totalMines - countFlags();
+
         System.out.println("Remaining Mines: " + remainingMines);
-        
+
         System.out.print("    ");
         for (int j = 0; j < cols; j++) {
             System.out.printf(" %2d ", (j + 1));
         }
         System.out.println();
-        
+
         String divider = "    +" + "---+".repeat(cols);
-        
+
         for (int i = 0; i < rows; i++) {
             System.out.println(divider);
             System.out.printf(" %2d |", (i + 1));
@@ -243,7 +261,7 @@ public class Board {
         logger.log(Level.INFO, "Generating game state summary for user.");
         int revealedCount = 0;
         int flagCount = countFlags();
-        
+
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 if (grid[i][j] != null && grid[i][j].isRevealed) {
@@ -251,11 +269,11 @@ public class Board {
                 }
             }
         }
-        
+
         int totalSafeCells = (rows * cols) - totalMines;
         int remainingSafeCells = totalSafeCells - revealedCount;
         double completion = calculateCompletionPercentage();
-        
+
         System.out.println("--- Game State Summary ---");
         System.out.println("Total Mines on Board : " + totalMines);
         System.out.println("Active Flags Placed  : " + flagCount);

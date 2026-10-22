@@ -59,7 +59,7 @@ public class Parser {
             return parseCoordinates(name, words, coordinateCommands, rows, columns);
         default:
             throw new IllegalArgumentException(
-                    "Unknown command: " + words[0] + ". Type help for usage.");
+                        "Unknown command: " + words[0] + ". Type help for usage.");
         }
     }
 
