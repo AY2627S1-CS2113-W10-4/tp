@@ -10,6 +10,7 @@ import java.util.Objects;
 public final class GameSession {
 
     private final ProfileManager profileManager;
+    private final GameTimer gameTimer;
     private Board board;
 
     /**
@@ -18,6 +19,7 @@ public final class GameSession {
     public GameSession(Board board, ProfileManager profileManager) {
         this.board = Objects.requireNonNull(board, "Board must not be null");
         this.profileManager = Objects.requireNonNull(profileManager, "Profile manager must not be null");
+        this.gameTimer = new GameTimer();
     }
 
     public Board getBoard() {
@@ -60,5 +62,9 @@ public final class GameSession {
 
     public int getColumnCount() {
         return board.grid[0].length;
+    }
+
+    public GameTimer getGameTimer() {
+        return gameTimer;
     }
 }

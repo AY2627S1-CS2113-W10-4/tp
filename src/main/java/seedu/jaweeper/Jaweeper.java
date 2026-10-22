@@ -3,6 +3,7 @@ package seedu.jaweeper;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.BiFunction;
@@ -30,7 +31,7 @@ public class Jaweeper {
                 return;
             }
             GameSession session = new GameSession(new Board(), profiles);
-            run(input, session, createCoordinateCommands(), createFeatureCommands(session));
+            run(input, session, createCoordinateCommands(session), createFeatureCommands(session));
         } catch (IOException exception) {
             LOGGER.log(Level.WARNING, "Could not load the profile registry", exception);
             System.out.println("Unable to open profiles: " + exception.getMessage());
@@ -39,12 +40,19 @@ public class Jaweeper {
     }
 
     /**
-     * Registers gameplay commands with zero-based row and column arguments.
+     * Registers gameplay commands for legacy/test usage without a session.
      */
     static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands() {
+        return createCoordinateCommands(null);
+    }
+
+    /**
+     * Registers gameplay commands with zero-based row and column arguments.
+     */
+    static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands(GameSession session) {
         Map<String, BiFunction<Integer, Integer, Command>> commands = new HashMap<>();
 
-        commands.put("r", RevealCommand::new);
+        commands.put("r", (row, col) -> new RevealCommand(session, row, col));
         commands.put("f", FlagCommand::new);
         commands.put("u", UnflagCommand::new);
 
@@ -59,6 +67,47 @@ public class Jaweeper {
     static Map<String, Function<String[], Command>> createFeatureCommands(GameSession session) {
         Map<String, Function<String[], Command>> commands = new HashMap<>();
         // Feature owners supply factories; Zack coordinates their registration here.
+
+        commands.put("stats", args -> {
+            if (args.length == 1 && args[0].equalsIgnoreCase("clear")) {
+                return new StatsClearCommand(session);
+            } else if (args.length == 0) {
+                return new StatsCommand(session);
+            } else {
+                throw new IllegalArgumentException("Usage: stats or stats clear");
+            }
+        });
+
+        commands.put("leaderboard", args -> {
+            if (args.length != 0) {
+                throw new IllegalArgumentException("Usage: leaderboard");
+            }
+            return new LeaderboardCommand(session);
+        });
+
+        commands.put("new", args -> {
+            Difficulty difficulty = Difficulty.EASY;
+            if (args.length == 1) {
+                String diffStr = args[0].toLowerCase(Locale.ROOT);
+                switch (diffStr) {
+                case "easy":
+                    difficulty = Difficulty.EASY;
+                    break;
+                case "medium":
+                    difficulty = Difficulty.MEDIUM;
+                    break;
+                case "hard":
+                    difficulty = Difficulty.HARD;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+                }
+            } else if (args.length > 1) {
+                throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+            }
+            return new NewGameCommand(session, difficulty);
+        });
+
         return commands;
     }
 
