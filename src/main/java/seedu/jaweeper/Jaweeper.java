@@ -85,6 +85,16 @@ public class Jaweeper {
             return new LeaderboardCommand(session);
         });
 
+        SaveTracker saveTracker = new SaveTracker();
+        commands.put("save", args -> SaveCommand.parse(args, session, saveTracker));
+        commands.put("load", args -> LoadCommand.parse(args, session, saveTracker));
+        commands.put("exit", args -> {
+            if (args.length != 0) {
+                throw new IllegalArgumentException("Usage: exit");
+            }
+            return new ExitCommand(saveTracker);
+        });
+
         commands.put("new", args -> {
             Difficulty difficulty = Difficulty.EASY;
             if (args.length == 1) {

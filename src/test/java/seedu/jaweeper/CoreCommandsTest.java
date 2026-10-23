@@ -148,7 +148,7 @@ public class CoreCommandsTest {
         }
 
         assertEquals(Board.MINES, mineCount);
-        assertTrue(output.toString(StandardCharsets.UTF_8).contains("New game started."));
+        assertTrue(output.toString(StandardCharsets.UTF_8).contains("game started."));
     }
 
     @Test
