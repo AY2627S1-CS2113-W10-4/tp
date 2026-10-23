@@ -53,9 +53,9 @@ public class Parser {
         case "board":
             requireNoArguments(words);
             return new PrintBoardCommand();
-        case "clear":
-            requireNoArguments(words);
-            return new ClearCommand();
+//        case "clear":
+//            requireNoArguments(words);
+//            return new ClearCommand();
         case "r":
         case "f":
         case "u":
