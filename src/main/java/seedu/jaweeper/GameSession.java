@@ -1,7 +1,9 @@
 package seedu.jaweeper;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Shares the current board and profile manager across commands in one application.
@@ -12,6 +14,9 @@ public final class GameSession {
     private final ProfileManager profileManager;
     private final GameTimer gameTimer;
     private Board board;
+    /** Cached safeclick value, valid for {@link #settingsProfileId} only. */
+    private boolean safeClickEnabled = ProfileSettings.DEFAULT_SAFE_CLICK;
+    private String settingsProfileId;
 
     /**
      * Creates a session using the application's single profile manager.
@@ -66,5 +71,35 @@ public final class GameSession {
 
     public GameTimer getGameTimer() {
         return gameTimer;
+    }
+
+    /**
+     * Returns whether the first reveal of a game is guaranteed safe for the active profile.
+     * The saved value is read once per profile and then cached. With no active profile
+     * (legacy/test usage) the default of true applies.
+     */
+    public boolean isSafeClickEnabled() {
+        Optional<Profile> active = profileManager.getActiveProfile();
+        if (active.isEmpty()) {
+            return ProfileSettings.DEFAULT_SAFE_CLICK;
+        }
+        String id = active.get().getId();
+        if (!id.equals(settingsProfileId)) {
+            safeClickEnabled = ProfileSettings.readSafeClick(profileManager.getProfileDirectory(id));
+            settingsProfileId = id;
+        }
+        return safeClickEnabled;
+    }
+
+    /**
+     * Saves the safeclick setting for the active profile. The file is written first, so a
+     * failed write leaves both the file and the in-memory value unchanged.
+     *
+     * @throws IOException If the setting cannot be written.
+     */
+    public void setSafeClickEnabled(boolean enabled) throws IOException {
+        ProfileSettings.writeSafeClick(getProfileDirectory(), enabled);
+        safeClickEnabled = enabled;
+        settingsProfileId = getActiveProfile().getId();
     }
 }

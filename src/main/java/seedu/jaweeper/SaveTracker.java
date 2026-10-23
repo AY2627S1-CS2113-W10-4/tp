@@ -83,6 +83,23 @@ public class SaveTracker {
         return false;
     }
 
+    /**
+     * Forgets the current game's link to a save that has just been deleted. The game then
+     * counts as unsaved (so exit warns again) and a plain {@code save} has no name to reuse.
+     *
+     * @return True if {@code name} was the save of the current game.
+     */
+    public boolean forgetSave(String name) {
+        if (!name.equals(currentSaveName)) {
+            return false;
+        }
+        trackedGrid = null;
+        savedSnapshot = null;
+        currentSaveName = null;
+        clearPending();
+        return true;
+    }
+
     private void clearPending() {
         pendingAction = null;
         pendingGrid = null;
