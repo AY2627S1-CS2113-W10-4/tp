@@ -25,7 +25,7 @@ public class HelpCommand extends Command {
         printEntry("settings", "Show your settings.");
         printEntry("settings safeclick on|off", "Make your first reveal safe, or not (saved per profile).");
         System.out.println("Other:");
-        printEntry("clear", "Clear the terminal.");
+        // printEntry("clear", "Clear the terminal.");
         printEntry("help", "Show this help.");
         printEntry("exit", "Exit Jaweeper (warns if you have unsaved progress).");
         System.out.println("Chaining: separate commands with ';' to run them in one line.");

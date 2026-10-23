@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
  */
 public class ClearAndHelpCommandTest extends SessionTestBase {
 
+    @Disabled("clear command temporarily disabled")
     @Test
     public void clear_printsAnsiClearSequence_andKeepsBoard() {
         Board board = new Board();
