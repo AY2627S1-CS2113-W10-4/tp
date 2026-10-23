@@ -131,6 +131,132 @@ See [the integration contract](ProfileIntegration.md) for the factory interface 
 * `Parser.java` and `NewGameCommand.java` were updated to route difficulty arguments (e.g., `new hard`) to generate the correct board.
 * The `copyStateFrom()` method allows the active `GameSession` to seamlessly adopt the new board dimensions without breaking the main game loop.
 
+### Saving and loading games
+
+**Maintainer:** Yong Xiang (yongxiang22).
+
+This feature lets a player save an unfinished game to a readable text file and continue it later with the time already spent. Before quitting or loading, the player is warned if the current game has unsaved moves. Corrupted or hand-edited save files are rejected without touching the game in progress.
+
+#### Overview
+
+The feature adds five classes and makes small additions to four existing ones. Figure 3 shows how they fit together.
+
+![Class diagram of the save/load component](images/SaveLoadClassDiagram.png)
+
+*Figure 3. Classes of the save/load component and the existing classes they use. Only the members discussed below are shown.*
+
+| Class | Responsibility |
+|---|---|
+| `SaveCommand`, `LoadCommand` | Parse their arguments when the command is created (no file access) and carry out the operation in `execute`. |
+| `SaveStore` | Owns save-name rules and file locations, `data/profiles/<UUID>/saves/<name>.txt`. Provides `save`, `load`, `list`, `delete` and `exists`. Uses the shared `Storage` helper for the actual reading and writing. |
+| `GameSaveCodec` | Converts a `Board` plus elapsed time to save-file lines and back, validating every line on the way in. Knows nothing about files or paths. |
+| `SaveTracker` | Remembers the position at the last save or load and decides whether the current game has unsaved progress. |
+| `SaveFileException` | A checked exception whose message is shown to the player as-is. |
+
+`Jaweeper.createFeatureCommands` creates **one** `SaveTracker` and passes it to the `save`, `load` and `exit` factories, so all three agree on what was last saved. The `exit` registration overrides the built-in `exit`; the no-argument `ExitCommand()` constructor still quits immediately, so existing tests are unaffected.
+
+Two small hooks were added to existing classes: `Board.restore(...)` builds a board from given cells without placing random mines, and `GameTimer.resumeFrom(ms)` / `getElapsedMillis()` let the timer continue from a saved duration.
+
+#### Saving a game
+
+Figure 4 shows what happens when the player types `save trip`.
+
+![Sequence diagram for save trip](images/SaveSequenceDiagram.png)
+
+*Figure 4. Successful `save trip`. Logging, the overwrite check and the failed-write branch are omitted.*
+
+1. The parser passes `["trip"]` to `SaveCommand.parse`, which checks and lowercases the name. The name may contain only letters, digits, `_` and `-`, so it can never contain `/` or `..` and escape the saves folder. Windows-reserved names such as `con` and `nul` are also rejected.
+2. `execute` refuses finished games, since there is nothing left to continue and the result is already recorded in the statistics.
+3. `SaveStore` asks `GameSaveCodec.encode` for the file contents, then writes them with `Storage.writeLines`. `Storage` writes to a temporary file first, so a failed write leaves any previous save intact.
+4. Only after the write succeeds does `SaveCommand` call `tracker.markSaved`. If the write throws an `IOException`, the command prints the error and does **not** mark the game as saved, so the exit warning still protects the player's progress.
+
+Plain `save` (no name) re-saves to the name this game was last saved to or loaded from, which `SaveTracker.getCurrentSaveName` provides.
+
+#### Save file format
+
+```
+jaweeper-save-v1
+size 3 4
+mines 2
+elapsed-ms 52340
+board
+00.x
+11f.
+1F..
+checksum 623d2492
+```
+
+| Symbol | Meaning |
+|---|---|
+| `.` | Hidden cell, no mine |
+| `x` | Hidden mine |
+| `f` | Flag on a safe cell |
+| `F` | Flag on a mine |
+| `0`–`8` | Revealed safe cell, showing its adjacent-mine count |
+
+The board section looks like the game board itself, so a developer can read a save while debugging. The last line is a CRC32 checksum of every line above it, written as 8 lowercase hex digits.
+
+#### Loading a game
+
+Figure 5 shows `load trip`, including the two places where loading can stop.
+
+![Sequence diagram for load trip](images/LoadSequenceDiagram.png)
+
+*Figure 5. `load trip`. The outer `alt` is the file check; the inner `alt` is the unsaved-progress check. `Storage.readLines` is shown as a self-call to keep the diagram narrow.*
+
+The key design point is the **order**: `LoadCommand` reads and fully decodes the file *before* asking for confirmation or replacing anything. Only after both checks pass does it call `replaceBoard`, `resumeFrom` and `markSaved`. A failed load therefore leaves the current game exactly as it was.
+
+`GameSaveCodec.decode` never trusts the file. It rejects the file with a message naming the line, where possible, if:
+
+1. The header `jaweeper-save-v1` is missing or different.
+2. The checksum line is missing or does not match. This catches truncated files, disk damage and hand edits.
+3. The `size`, `mines` or `elapsed-ms` line is malformed, including signs, non-digits and over-long numbers.
+4. Rows or columns are outside 1–99, or the mine count is outside 1 to (cells − 1).
+5. A board row has the wrong length or an unknown symbol, or there are too many or too few rows.
+6. The number of mines in the grid differs from the `mines` line.
+7. A revealed number does not match the recalculated count. `Board.restore` always recalculates adjacency itself, so the file's numbers are only checked, never used.
+8. Every safe cell is already revealed, which means the game is finished.
+
+The checksum is checked first so a hand-edited file gets a clear "changed outside Jaweeper" message. Checks 3–8 still matter: they catch files written by a buggy future version, and they stop bad data from reaching `Board`'s assertions.
+
+Whether a game was saved before its first reveal is worked out from the grid (no revealed cells), so the safe-first-click rule still applies after loading such a game.
+
+#### Detecting unsaved progress
+
+Rather than adding a `markDirty()` call to every command that changes the board, `SaveTracker` compares the board with a snapshot taken at the last save or load. Figure 6 shows the decision made by `confirmDiscard`, which both `exit` and `load` call.
+
+![Activity diagram for confirmDiscard](images/ConfirmDiscardActivityDiagram.png)
+
+*Figure 6. How `SaveTracker.confirmDiscard` decides whether `exit` or `load` may go ahead.*
+
+- `markSaved(board, name)` stores a reference to the board's grid array and the grid's encoded rows.
+- A board has unsaved changes if the game is unfinished, at least one cell is revealed or flagged, and either the grid is a **different array** from the snapshot (`new` or another load replaced it) or its rows differ.
+- The first progress-losing request remembers the action (`"exit"` or `"load trip"`) and the current position, prints a warning and returns `false`. Repeating the **same** action with no move in between returns `true`. Any move, or a different action, needs a fresh confirmation.
+
+Comparing the grid array by identity also stops plain `save` from overwriting the previous game's file after `new`, because `NewGameCommand` installs a fresh grid array through `copyStateFrom`. The comparison is one pass over the grid per `exit`, `load` or `save`, which is negligible for boards up to 99×99.
+
+#### Design decisions and alternatives
+
+| Decision | Alternative considered | Reason and trade-off |
+|---|---|---|
+| Readable text with a CRC32 checksum | Binary or Java serialisation | Readable files help debugging and suit the course's text-file requirement. CRC32 detects edits and damage but is not tamper-proof against someone who recomputes it; that is acceptable for a single-player game. |
+| Recalculate adjacency on load | Trust the numbers in the file | One source of truth; the stored digits still keep the file readable and act as an extra consistency check. |
+| Validate everything before replacing the board | Load cell by cell into the live board | No half-loaded game on error, at the cost of building a second board in memory. |
+| Snapshot comparison for unsaved changes | A dirty flag set by each command | No changes to teammates' commands, and new commands are covered automatically. |
+| Type the same command twice to confirm | A separate `y/n` prompt | Works within the existing one-line-per-command loop with no new input mode; the trade-off is a less familiar confirmation style. |
+| Lowercase, restricted save names | Free-form names | Prevents path traversal (`../`), Windows-reserved names, and names that differ only in case colliding on Windows and macOS. |
+
+#### Testing and known limitations
+
+- `GameSaveCodecTest` covers round trips (including a random 16×30 board), checksum tampering and truncation. It also tests each content check above using files with a *valid* checksum, so only the content check can catch the problem.
+- `SaveLoadCommandsTest` uses JUnit temporary folders to test the store, name validation, saving and loading, re-saving, refusing finished games, keeping the current game after a bad load, both confirmation flows, and a full run through `Jaweeper.run`.
+
+**Limitations and planned work:**
+
+- Pressing Ctrl-D (end of input) ends the loop without the unsaved-progress warning, because it bypasses commands. A future change could auto-save to a reserved slot on end of input.
+- Runtime profile switching, once added, must call `SaveTracker.confirmDiscard` before changing profile, since saves belong to one profile.
+- ZW's planned `saves list` and `saves delete` commands will call `SaveStore.list()` and `SaveStore.delete(name)` rather than building paths themselves.
+
 ## Product scope
 ### Target user profile
 

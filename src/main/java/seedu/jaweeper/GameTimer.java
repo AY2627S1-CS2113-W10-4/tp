@@ -32,6 +32,24 @@ public class GameTimer {
         this.elapsedMillis = 0;
         this.isRunning = false;
     }
+    public void resumeFrom(long previousElapsedMillis) {
+        assert previousElapsedMillis >= 0 : "Elapsed time cannot be negative";
+        this.elapsedMillis = previousElapsedMillis;
+        this.startTime = System.currentTimeMillis();
+        this.isRunning = true;
+    }
+
+    /**
+     * Returns the exact elapsed time in milliseconds, including any running interval.
+     */
+    public long getElapsedMillis() {
+        long totalMillis = elapsedMillis;
+        if (isRunning) {
+            totalMillis += (System.currentTimeMillis() - startTime);
+        }
+        return totalMillis;
+    }
+
 
     public long getElapsedTimeSeconds() {
         long totalMillis = elapsedMillis;

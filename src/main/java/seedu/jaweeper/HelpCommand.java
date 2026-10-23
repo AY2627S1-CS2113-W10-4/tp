@@ -11,7 +11,9 @@ public class HelpCommand extends Command {
         System.out.println("  help       Show this help.");
         System.out.println("  board      Display the current board.");
         System.out.println("  new        Start a new game.");
-        System.out.println("  exit       Exit Jaweeper.");
+        System.out.println("  save NAME  Save this game (plain 'save' re-saves to the same name).");
+        System.out.println("  load NAME  Continue a saved game.");
+        System.out.println("  exit       Exit Jaweeper (warns if you have unsaved progress).");
         System.out.println("  r ROW COL  Reveal a cell.");
         System.out.println("  f ROW COL  Flag a cell.");
         System.out.println("  u ROW COL  Remove a flag.");

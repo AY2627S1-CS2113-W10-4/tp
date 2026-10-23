@@ -46,6 +46,35 @@ public class Board {
         logger.info("New board initialized with " + totalMines + " mines.");
     }
 
+    
+
+    private Board(int rows, int cols, int totalMines, Cell[][] cells) {
+        this.rows = rows;
+        this.cols = cols;
+        this.totalMines = totalMines;
+        this.grid = cells;
+        calculateAdjacencies();
+
+        boolean hasRevealedCell = false;
+        for (Cell[] row : cells) {
+            for (Cell cell : row) {
+                hasRevealedCell |= cell.isRevealed;
+            }
+        }
+        // The safe-first-click rule still applies to a game saved before any reveal.
+        this.isFirstMove = !hasRevealedCell;
+        assert countMines() == totalMines : "Restored board must contain exactly " + totalMines + " mines";
+    }
+
+    
+    static Board restore(int rows, int cols, int totalMines, Cell[][] cells) {
+        assert cells != null && cells.length == rows : "Row count must match the saved grid";
+        assert rows > 0 && cols > 0 && cells[0].length == cols : "Column count must match the saved grid";
+        assert totalMines > 0 && totalMines < rows * cols : "Invalid number of mines";
+        return new Board(rows, cols, totalMines, cells);
+    }
+
+
     private void placeMines() {
         Random rand = new Random();
         int minesPlaced = 0;
