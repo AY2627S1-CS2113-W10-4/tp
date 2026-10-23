@@ -93,6 +93,15 @@ public class Board {
         return isFirstMove;
     }
 
+    /**
+     * Marks the first move as used without relocating any mines.
+     * Called instead of {@link #ensureSafeFirstClick(int, int)} when the player has
+     * turned the safeclick setting off, so the first reveal can hit a mine.
+     */
+    public void skipSafeFirstClick() {
+        isFirstMove = false;
+    }
+
     public void ensureSafeFirstClick(int row, int col) {
         assert row >= 0 && row < rows : "Row index out of bounds: " + row;
         assert col >= 0 && col < cols : "Column index out of bounds: " + col;
@@ -239,11 +248,29 @@ public class Board {
             System.out.println(divider);
             System.out.printf(" %2d |", (i + 1));
             for (int j = 0; j < cols; j++) {
-                System.out.print(" " + grid[i][j].getIcon() + " |");
+                System.out.print(" " + iconFor(grid[i][j]) + " |");
             }
             System.out.println();
         }
         System.out.println(divider);
+    }
+
+    /**
+     * Returns the symbol to draw for a cell. Once the game is lost, every mine the player
+     * had not flagged is uncovered as '*', and a flag on a safe cell is marked 'X' so the
+     * player can see which flags were wrong. The cells themselves are not modified, so
+     * progress figures such as the completion percentage are unaffected.
+     */
+    private String iconFor(Cell cell) {
+        if (gameState == GameState.LOST) {
+            if (cell.isMine && !cell.isFlagged) {
+                return "*";
+            }
+            if (cell.isFlagged && !cell.isMine) {
+                return "X";
+            }
+        }
+        return cell.getIcon();
     }
 
     public boolean checkVictory() {

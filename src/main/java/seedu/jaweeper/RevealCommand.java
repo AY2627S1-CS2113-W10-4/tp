@@ -52,7 +52,12 @@ public class RevealCommand extends Command {
         assert target != null : "Cell in grid must not be null";
 
         // Classic Minesweeper: the first reveal of a game is never a mine and opens a blank area.
-        board.ensureSafeFirstClick(row, col);
+        // The player can switch this off with 'settings safeclick off'.
+        if (session == null || session.isSafeClickEnabled()) {
+            board.ensureSafeFirstClick(row, col);
+        } else {
+            board.skipSafeFirstClick();
+        }
 
         if (target.isMine) {
             revealMine(board, target);
@@ -78,7 +83,7 @@ public class RevealCommand extends Command {
     }
 
     /**
-     * Reveals a mine, marks the game as lost, stops the timer, and updates statistics.
+     * Reveals a mine, marks the game as lost, stops the timer, updates statistics and shows all mines.
      */
     private void revealMine(Board board, Cell target) {
         target.isRevealed = true;
@@ -96,6 +101,8 @@ public class RevealCommand extends Command {
         LOGGER.log(Level.INFO, "Mine hit at (" + row + ", " + col + "); game lost");
 
         System.out.println("BOOM! You hit a mine at (" + (row + 1) + ", " + (col + 1) + ").");
+        // The board is drawn after the state is LOST, so every remaining mine is shown.
+        board.printBoard();
         System.out.println("========================");
         System.out.println("       GAME OVER        ");
         System.out.println("========================");
