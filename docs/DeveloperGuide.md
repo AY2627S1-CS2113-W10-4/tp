@@ -70,12 +70,12 @@ A player's feature data belongs under `data/profiles/<UUID>/`. Changing a displa
 
 #### Command parsing and execution
 
-For each input line, the session-aware loop reads the current board dimensions and passes them to `Parser.parse`. Command names are lowercased with `Locale.ROOT`; argument case is preserved.
+For each command on an input line (a line may chain several commands, see [Gameplay quality-of-life features](#gameplay-quality-of-life-features)), the session-aware loop reads the current board dimensions and passes them to `Parser.parse`. Command names are lowercased with `Locale.ROOT`; argument case is preserved.
 
 Dispatch follows this order:
 
 1. If a matching lowercase key exists in the feature registry, invoke its `Function<String[], Command>` factory with the argument tokens, excluding the command name.
-2. Otherwise, handle built-in `help`, `exit`, `new` and `board` commands, rejecting extra arguments.
+2. Otherwise, handle built-in `help`, `exit`, `new` and `board` commands, rejecting extra arguments. (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
 3. For `r`, `f` and `u`, validate two integer coordinates against separate row/column limits, convert from one-based input to zero-based indices, and invoke the registered coordinate factory.
 
 Unknown commands and invalid arguments produce `IllegalArgumentException` messages. The loop displays the message and continues. Factories construct commands; they must not mutate gameplay or perform persistence as a parsing side effect.
@@ -88,7 +88,7 @@ The parser converts the coordinates to `(1, 2)` before calling the flag factory.
 
 Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. The feature registry is intentionally empty in this baseline: the extension mechanism is implemented, but teammates' new commands have not been registered yet.
 
-Feature registrations take precedence over built-ins. For example, registering `new` would take over both `new easy` and plain `new`, so its factory must define both cases. Whitespace tokenization currently does not implement quoting or semicolon-separated command chains.
+Feature registrations take precedence over built-ins. For example, registering `new` would take over both `new easy` and plain `new`, so its factory must define both cases. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
 
 #### Defensive checks and error boundaries
 
@@ -255,7 +255,131 @@ Comparing the grid array by identity also stops plain `save` from overwriting th
 
 - Pressing Ctrl-D (end of input) ends the loop without the unsaved-progress warning, because it bypasses commands. A future change could auto-save to a reserved slot on end of input.
 - Runtime profile switching, once added, must call `SaveTracker.confirmDiscard` before changing profile, since saves belong to one profile.
-- ZW's planned `saves list` and `saves delete` commands will call `SaveStore.list()` and `SaveStore.delete(name)` rather than building paths themselves.
+- The `saves` and `delete NAME` commands call `SaveStore.list()` and `SaveStore.delete(name)` rather than building paths themselves; see [Gameplay quality-of-life features](#gameplay-quality-of-life-features).
+
+### Gameplay quality-of-life features
+
+**Maintainer:** Zhe Wen (zzzwun).
+
+This section covers five additions that make the game nicer to play: showing every mine after a loss, a per-profile safeclick setting, chaining several commands on one line, listing and deleting saved games, and an updated `help`. It also documents `clear`, which is implemented but currently disabled.
+
+#### Command summary & syntax
+
+| Command | Format | Description | Example |
+| :--- | :--- | :--- | :--- |
+| **Settings** | `settings` | Shows the active profile's settings. | `settings` |
+| **Safeclick** | `settings safeclick on\|off` | Turns the guaranteed-safe first reveal on or off for the active profile. Saved across launches. | `settings safeclick off` |
+| **Saves** | `saves` | Lists the active profile's saved games alphabetically. | `saves` |
+| **Delete** | `delete NAME` | Deletes a saved game. Must be typed twice to confirm. | `delete trip` |
+| **Chaining** | `COMMAND; COMMAND; ...` | Runs several commands from one input line. | `f 1 1; f 2 3` |
+| **Clear** *(disabled)* | `clear` | Clears the terminal. | `clear` |
+
+#### Showing all mines after a loss
+
+`RevealCommand.revealMine` sets the game state to `LOST` and then calls `board.printBoard()`. While the state is `LOST`, `Board.iconFor(cell)` chooses what each cell looks like, instead of always using `Cell.getIcon()`:
+
+| Cell | Shown as |
+|---|---|
+| Mine, not flagged | `*` |
+| Flag on a safe cell | `X` |
+| Flag on a mine | `F` (unchanged) |
+| Anything else | Whatever `Cell.getIcon()` returns |
+
+This is display only: no `isRevealed` flag is changed. That keeps `calculateCompletionPercentage`, the statistics and any later snapshot of the grid unaffected by the loss screen. The `board` command shows the same view for as long as the game stays lost, and `new` resets the state, so mines are hidden again in the next game.
+
+#### Safeclick setting
+
+| Class | Responsibility |
+|---|---|
+| `SettingsCommand` | Parses `settings` and `settings safeclick on\|off` when created (no file access) and displays or changes the setting in `execute`. |
+| `ProfileSettings` | Reads and writes `data/profiles/<UUID>/settings.txt`. Static methods only; knows nothing about commands. |
+| `GameSession` | `isSafeClickEnabled()` and `setSafeClickEnabled(boolean)`. Caches the value for the active profile so a reveal does not read a file. |
+| `Board`, `RevealCommand` | On the first reveal, `RevealCommand` calls `ensureSafeFirstClick` if safeclick is on, or the new `skipSafeFirstClick` if it is off. |
+
+The file is two lines: the header `jaweeper-settings-v1`, then `safeclick on` or `safeclick off`. It is kept apart from `profiles.txt` on purpose, because the registry is strictly validated and a change to its format would affect every profile.
+
+How the value is read and written:
+
+- A missing, unreadable or malformed file means the default (on). The file is not overwritten until the player changes a setting, so a hand-edited file is not silently destroyed.
+- `setSafeClickEnabled` writes the file first and only then updates the cached value, the same policy as the profile registry. If the write fails, `SettingsCommand` reports the error and nothing changes.
+- The cache is keyed by the active profile's ID, so selecting another profile in the same session reads that profile's own value.
+- With no session (legacy test usage) or no active profile, safeclick is on, which matches the behaviour before this feature.
+
+`skipSafeFirstClick` clears the board's first-move flag without moving any mines. Without it, turning safeclick off would leave the flag set, and a later reveal could still trigger the mine relocation. The setting is checked when the first reveal happens, so a game that has not been revealed yet follows the current value, while a game already in progress is unaffected.
+
+#### Command chaining
+
+`Jaweeper.runLoop` now hands each input line to `runLine`, which uses `splitChain` to split it on `;` and then runs each segment in turn:
+
+1. `splitChain` trims each segment and drops empty ones, so `f 1 1;; f 2 3;` works. A line with no commands at all is passed through unchanged so the parser still reports "Enter a command".
+2. Each segment is parsed **just before it runs**, not all up front. This matters because the board can change partway through a line: in `new hard; f 15 29`, the coordinate `15 29` is only valid on the 16×30 board that `new hard` creates. Parsing lazily lets `Parser` validate against the board as it is at that moment.
+3. If parsing or executing a segment throws `IllegalArgumentException`, the message is printed and the **next segment still runs**.
+4. If a segment is an accepted `exit`, the loop ends and later segments are not run.
+5. If the game ends during a segment (a win or a loss) and more segments remain, they are skipped and one line says how many. Without this, every remaining `r`, `f` or `u` would print its own "The game is over" message.
+
+`Parser` is unchanged and still handles one command per call. Doing the split in the loop means both `run` overloads, including the legacy test entry point, get chaining.
+
+Two consequences to be aware of. First, `exit; exit` counts as the confirming repeat for the unsaved-progress warning, because `SaveTracker.confirmDiscard` compares the action and the board position, not how many input lines were typed. `delete x; delete x` behaves the same way. Second, `;` cannot appear inside a command's arguments; this is already true because save names allow only letters, digits, `_` and `-`.
+
+#### Listing and deleting saves
+
+`SavesCommand` calls `SaveStore.list()` and prints the names, or a hint to use `save NAME` if there are none. `DeleteCommand` uses `SaveStore.exists` and `SaveStore.delete`. Both work only inside the active profile's saves folder, as `SaveStore` already guarantees.
+
+`delete NAME` follows the same "type it twice" convention as `exit` and `load`:
+
+1. If no save has that name, a message is printed and any pending confirmation is cleared.
+2. Otherwise, the first request prints a permanent-deletion warning and remembers the name.
+3. Typing the same `delete NAME` again deletes the file. Requesting a different name replaces the remembered one, so each save needs its own confirmation.
+
+Command objects are created fresh for every input line, so the remembered name lives in a `DeleteCommand.Confirmation` object. `Jaweeper.createFeatureCommands` creates one and passes it to every `delete` command, in the same way it shares one `SaveTracker`. `SaveTracker.confirmDiscard` is not reused here because it asks "does the current board have unsaved moves?", which is unrelated to deleting a file.
+
+`delete` also calls the new `SaveTracker.forgetSave(name)`. If `name` is the save that the current game was last saved to or loaded from, the tracker forgets it. The game then counts as unsaved again, so `exit` warns, and a plain `save` has no name to reuse and asks for one. `forgetSave` returns whether it did this, and `DeleteCommand` prints a note when it did. Because deleting does not decode the file, a corrupted save that cannot be loaded can still be deleted.
+
+#### The clear command (temporarily disabled)
+
+`ClearCommand` prints the ANSI sequence `ESC[H ESC[2J ESC[3J` (move the cursor home, erase the screen, erase the scrollback) and flushes. It does not touch the game state and does not reprint the board.
+
+The command is currently disabled in three places. To re-enable it, uncomment all three:
+
+- the `case "clear"` branch in `Parser.parse`,
+- the `clear` line in `HelpCommand`,
+- `@Disabled` on `clear_printsAnsiClearSequence_andKeepsBoard` in `ClearAndHelpCommandTest`.
+
+Terminals that understand ANSI codes clear correctly. Some IDE consoles ignore the codes, in which case nothing visible happens.
+
+#### The help command
+
+`HelpCommand` groups commands by purpose (playing, saved games, player, other) and prints them through a small `printEntry` helper so the descriptions line up. It also explains chaining. The coordinate range is read from the `Board` passed to `execute`, so on a 16×30 board it shows "rows 1 to 16, columns 1 to 30" rather than the deprecated `Board.SIZE`. When a command is added or removed, its `printEntry` line must be updated too.
+
+#### Design decisions and alternatives
+
+| Decision | Alternative considered | Reason and trade-off |
+|---|---|---|
+| Draw mines in `printBoard` while the state is `LOST` | Set `isRevealed` on every mine when the game is lost | The display change cannot affect completion percentage, statistics or snapshots. The cost is that the rule lives in `Board.iconFor` rather than in `Cell`. |
+| Store safeclick in a separate `settings.txt` per profile | Add a column to `profiles.txt` | The registry stays strictly validated and its format unchanged. A second file per profile has to be read and written separately. |
+| Fall back to the default and never overwrite a bad settings file | Fail startup on a malformed file | A damaged setting should not stop the game, and the player's file is kept until they choose to change it. A typo in the file is silently ignored. |
+| Split chains in `Jaweeper`, parse each segment when it runs | Teach `Parser` to return a list of commands | Commands can change the board (`new`, `load`), so later segments must be validated against the updated board, and both `run` overloads get chaining. Parsing errors appear only when the segment is reached. |
+| Keep running after a failed command in a chain | Stop at the first error | The player sees every error and the valid commands still apply. A mistake early in a line does not cancel later commands that may depend on it. |
+| Skip the rest of a line when the game ends | Run every command and let each report "game over" | One note replaces a wall of repeated messages. The player cannot chain a `new` after a game-ending move on the same line. |
+| Share one `DeleteCommand.Confirmation` between delete commands | Store the pending name in `SaveTracker` or a static field | A command object lives for only one input line, so the state must be shared. A dedicated object keeps delete logic out of `SaveTracker` and avoids global state. |
+| `forgetSave` on delete | Leave the tracker unchanged | Otherwise `exit` would stay silent for a game whose save file no longer exists. One more method on `SaveTracker`. |
+
+#### Testing and known limitations
+
+The tests share setup (a temporary profile folder, captured output, a script runner) through the abstract class `SessionTestBase`:
+
+- `LossRevealTest` checks `*`, `X` and `F` after a loss, that cell state is unchanged, and that an in-progress board hides mines.
+- `SettingsCommandTest` covers safeclick on and off, persistence across a simulated restart, separate values per profile, invalid arguments and a malformed settings file.
+- `CommandChainingTest` covers `splitChain`, errors in the middle of a line, `exit`, parsing against a board changed by `new hard`, the game-ending skip and blank lines.
+- `SavesAndDeleteCommandTest` covers listing, the two-step delete, a different name needing a fresh confirmation, missing or invalid names, and the effect of deleting the current game's save on `exit`.
+- `ClearAndHelpCommandTest` covers the ANSI output and the help text. The `clear` test is currently `@Disabled`.
+
+**Known limitations:**
+
+- `exit; exit` and `delete x; delete x` on a single line count as confirmed repeats, as described under command chaining.
+- `clear` depends on the terminal understanding ANSI codes, and is disabled for now.
+- Safeclick changes apply at the next first reveal, not to a game already in progress.
+- `UserGuide.md` does not yet describe these commands.
 
 ## Product scope
 ### Target user profile
