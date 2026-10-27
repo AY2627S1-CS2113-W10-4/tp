@@ -59,6 +59,9 @@ public class Jaweeper {
     static Map<String, Function<String[], Command>> createFeatureCommands(GameSession session) {
         Map<String, Function<String[], Command>> commands = new HashMap<>();
         // Feature owners supply factories; Zack coordinates their registration here.
+        // @@author ProNoob116
+        commands.put("hint", HintCommand::create);
+        // @@author
         return commands;
     }
 

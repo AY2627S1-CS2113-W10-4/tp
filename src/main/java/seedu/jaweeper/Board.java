@@ -5,18 +5,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Board {
-    private static final Logger logger = Logger.getLogger(Board.class.getName());
-    
     @Deprecated
     public static final int SIZE = 9;
     @Deprecated
     public static final int MINES = 10;
-    
+    private static final Logger logger = Logger.getLogger(Board.class.getName());
+
+    public Cell[][] grid;
     private int rows;
     private int cols;
     private int totalMines;
-    
-    public Cell[][] grid;
     private GameState gameState = GameState.IN_PROGRESS;
     private boolean isFirstMove = true;
 
