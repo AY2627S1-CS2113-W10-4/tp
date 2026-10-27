@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Stack;
 
 /**
  * Shares the current board and profile manager across commands in one application.
@@ -14,6 +15,9 @@ public final class GameSession {
     private final ProfileManager profileManager;
     private final GameTimer gameTimer;
     private Board board;
+    // @@author ProNoob116
+    private final Stack<Board> boardHistory = new Stack<>();
+    // @@author
     /** Cached safeclick value, valid for {@link #settingsProfileId} only. */
     private boolean safeClickEnabled = ProfileSettings.DEFAULT_SAFE_CLICK;
     private String settingsProfileId;
@@ -102,4 +106,37 @@ public final class GameSession {
         safeClickEnabled = enabled;
         settingsProfileId = getActiveProfile().getId();
     }
+
+    // @@author ProNoob116
+    /**
+     * Saves an independent copy of the board before a reveal or flag changes it.
+     */
+    public void pushBoardHistory(Board current) {
+        assert current != null : "Cannot record a null board";
+        boardHistory.push(current.deepCopy());
+    }
+
+    /**
+     * Restores the most recent saved board into {@code current}.
+     *
+     * @return True if a previous board was restored.
+     */
+    public boolean undoLastMove(Board current) {
+        assert current != null : "Current board must not be null";
+        if (boardHistory.isEmpty()) {
+            return false;
+        }
+        Board previous = boardHistory.pop();
+        current.copyStateFrom(previous);
+        this.board = current;
+        return true;
+    }
+
+    /**
+     * Forgets saved boards, for example when a new game replaces the current one.
+     */
+    public void clearBoardHistory() {
+        boardHistory.clear();
+    }
+    // @@author
 }

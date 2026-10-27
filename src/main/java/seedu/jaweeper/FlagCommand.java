@@ -8,16 +8,42 @@ public class FlagCommand extends Command {
 
     private int row;
     private int col;
+    // @@author ProNoob116
+    private GameSession session;
+    // @@author
 
     public FlagCommand(int row, int col) {
         this.row = row;
         this.col = col;
     }
 
+    // @@author ProNoob116
+    /**
+     * Creates a flag command that can record the board for undo.
+     */
+    public FlagCommand(GameSession session, int row, int col) {
+        this(row, col);
+        this.session = session;
+    }
+
+    /**
+     * Saves the board before this flag command changes it.
+     */
+    private void recordHistory(Board board) {
+        if (session != null) {
+            session.pushBoardHistory(board);
+        }
+    }
+    // @@author
+
     @Override
     public void execute(Board board) {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before flagging";
+
+        // @@author ProNoob116
+        recordHistory(board);
+        // @@author
 
         logger.log(Level.FINE, "Flag requested at (" + row + ", " + col + ")");
 

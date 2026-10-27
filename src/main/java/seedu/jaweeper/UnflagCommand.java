@@ -8,16 +8,42 @@ public class UnflagCommand extends Command {
 
     private final int row;
     private final int col;
+    // @@author ProNoob116
+    private GameSession session;
+    // @@author
 
     public UnflagCommand(int row, int col) {
         this.row = row;
         this.col = col;
     }
 
+    // @@author ProNoob116
+    /**
+     * Creates an unflag command that can record the board for undo.
+     */
+    public UnflagCommand(GameSession session, int row, int col) {
+        this(row, col);
+        this.session = session;
+    }
+
+    /**
+     * Saves the board before this unflag command changes it.
+     */
+    private void recordHistory(Board board) {
+        if (session != null) {
+            session.pushBoardHistory(board);
+        }
+    }
+    // @@author
+
     @Override
     public void execute(Board board) {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before unflagging";
+
+        // @@author ProNoob116
+        recordHistory(board);
+        // @@author
 
         logger.log(Level.FINE, "Unflag requested at (" + row + ", " + col + ")");
 

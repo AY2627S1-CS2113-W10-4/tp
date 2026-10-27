@@ -178,6 +178,17 @@ public class Board {
         }
     }
 
+    // @@author ProNoob116
+    /**
+     * Returns an independent copy of this board, including every cell.
+     */
+    public Board deepCopy() {
+        Board copy = new Board(rows, cols, totalMines);
+        copy.copyStateFrom(this);
+        return copy;
+    }
+    // @@author
+
     private void calculateAdjacencies() {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
