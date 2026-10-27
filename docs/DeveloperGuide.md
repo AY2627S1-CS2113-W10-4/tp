@@ -1,34 +1,101 @@
 # Developer Guide
 
-## Acknowledgements
+Jaweeper is a Java command-line Minesweeper game with local player profiles.
+This guide explains its implementation, extension points and verification steps for developers.
+For player-facing command instructions, see the [User Guide](UserGuide.md).
 
-{list here sources of all reused/adapted ideas, code, documentation, and third-party libraries -- include links to the original source as well}
+The descriptions below distinguish the current implementation from planned work.
+A method available to Java callers is not necessarily exposed as a player command.
+In particular, startup profile creation/selection is available, while in-game profile management is still pending.
+
+## Contents
+
+- [Product scope](#product-scope)
+- [User stories](#user-stories)
+- [Setting up and verification](#setting-up-and-verification)
+- [Design and implementation](#design--implementation)
+  - [Command processing and profile sessions](#command-processing-and-profile-sessions)
+  - [Difficulty levels and dynamic boards](#difficulty-levels-and-dynamic-boards)
+  - [Statistics and leaderboard](#statistics-and-leaderboard-feature)
+  - [Saving and loading games](#saving-and-loading-games)
+  - [Gameplay quality-of-life features](#gameplay-quality-of-life-features)
+- [Non-functional requirements](#non-functional-requirements)
+- [Glossary](#glossary)
+- [Instructions for manual testing](#instructions-for-manual-testing)
+- [Acknowledgements](#acknowledgements)
+
+## Product scope
+
+### Target user profile
+
+Jaweeper is intended for people who want short, keyboard-driven Minesweeper games in a terminal.
+They can run a Java application and enter row/column commands without needing a graphical interface.
+Several people may keep separate local profiles on the same computer, using the application one at a time.
+
+### Value proposition
+
+The application provides Minesweeper play, selectable difficulty and named local saves in a command-line workflow.
+A player can pause an unfinished game and continue it later under the same profile.
+Profiles separate local saved games and settings; they are not authenticated accounts or a privacy boundary.
+The application does not provide online multiplayer, cloud synchronisation or simultaneous access to shared data.
+
+## User Stories
+
+These stories summarise the implemented scope and remaining profile work.
+Status describes the current command interface, not merely the presence of a model method.
+
+| As a ... | I want to ... | So that I can ... | Current status |
+|---|---|---|---|
+| New player | view command help | learn the available inputs and coordinate range | Available through `help`. |
+| Player | reveal, flag and unflag cells | solve a Minesweeper board using the keyboard | Available through `r`, `f` and `u`. |
+| Returning player | create or choose a local profile at launch | keep my saves and settings separate | Available at startup. |
+| Player | start an easy, medium or hard game | choose the size and challenge | Available through `new [easy\|medium\|hard]`. |
+| Player | save and restore an unfinished game | continue it in a later session | Available through `save` and `load`. |
+| Player | list and delete named saves | manage my stored games | Available through `saves` and `delete`. |
+| Player | control safe-first-reveal behaviour | choose how the first move behaves | Available through `settings safeclick on\|off`. |
+| Player | view statistics and a leaderboard | inspect recorded results | Commands exist; statistics currently remain in memory. |
+| Player | create, select, rename or delete profiles during play | manage players without relaunching | Planned; no in-game `profile` route yet. |
+
+## Setting up and verification
+
+Use JDK **25** and Git. Clone the repository and open its root folder as a Gradle project.
+Use the committed Gradle wrapper; a separate Gradle installation is not required.
+The first build needs Internet access to download build dependencies.
+
+| Path | Purpose |
+|---|---|
+| `src/main/java/seedu/jaweeper/` | Application, command, model and storage classes. |
+| `src/test/java/seedu/jaweeper/` | Unit and integration tests. |
+| `config/checkstyle/` | Java style rules enforced by the build. |
+| `docs/` | User Guide, Developer Guide and supporting images. |
+| `build/libs/jaweeper.jar` | Executable JAR produced by `shadowJar`. |
+| `data/` | Runtime data, relative to the directory from which the application is launched. |
+
+From the repository root, run:
+
+```powershell
+# Windows PowerShell
+.\gradlew.bat check shadowJar
+java -ea -jar build/libs/jaweeper.jar
+```
+
+On macOS/Linux, use `./gradlew check shadowJar` instead.
+`check` runs JUnit tests and Checkstyle; `shadowJar` builds the executable JAR.
+The Gradle test and run tasks enable assertions. Use `-ea` when launching the JAR to enable them there too.
+
+JUnit tests that touch persistent data should use temporary directories.
+For manual testing, copy the JAR into a separate empty folder and launch it from that folder.
+This isolates the test's `data/` directory from existing player data.
+Do not use a player's real saves for corruption or deletion tests.
 
 ## Design & implementation
-
-### Statistics and Leaderboard Feature
-
-The statistics module tracks player performance metrics per profile, ensuring that personal scores are preserved independently across sessions.
-
-#### Architecture and Components
-- **`Stats` Model**: Maintains counts for wins, losses, current win streaks, maximum win streaks, and a historical list of completion times.
-- **`GameTimer`**: Records high-precision elapsed game duration using system timestamps (`System.currentTimeMillis()`), which is automatically triggered on game start and processed upon victory.
-- **Persistence**: Profile-specific statistics are serialized and stored independently under each player's designated directory (e.g., `data/profiles/<UUID>/stats.txt`) via the `Storage` subsystem.
-
-#### Command Summary & Syntax
-
-| Command | Format | Description | Example |
-| :--- | :--- | :--- | :--- |
-| **Stats** | `stats` | Displays performance metrics for the currently active profile (win rate, streaks, recent times). | `stats` |
-| **Stats Clear** | `stats clear` | Resets all recorded wins, losses, streaks, and times for the active profile. | `stats clear` |
-| **Leaderboard** | `leaderboard` | Compiles and ranks all registered profiles by win count and completion times. | `leaderboard` |
 
 ### Command processing and profile sessions
 
 **Maintainer:** Zack (zackyesten).
-**Implementation baseline:** the foundation and runtime integration merged in [PR #34](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/34).
+**Implementation scope:** the profile/session foundation introduced in [PR #34](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/34), with the subsequently integrated command routes described below.
 
-This section explains how Jaweeper selects a local player, turns text input into commands, and gives commands access to the same current board and profile. It documents the implemented foundation, not the complete planned v2.0 feature set. In-game profile management commands, save/load, statistics and progress-loss confirmation are not provided by this foundation.
+This section explains how Jaweeper selects a local player, turns text input into commands, and gives commands access to the same current board and profile. Save/load, statistics, difficulty presets and settings now use this integration. Their domain logic is described in the corresponding feature sections. In-game `profile create/select/rename/delete` commands are not yet registered.
 
 #### Architecture and responsibilities
 
@@ -38,7 +105,7 @@ The implementation separates input coordination, command construction, shared st
 |---|---|---|
 | Application startup and execution | `Jaweeper`, `ProfileStartup` | Own the input loop and startup selection; delegate feature logic to commands. |
 | Input interpretation | `Parser` | Validate syntax and coordinates, then construct a command without executing it. |
-| Shared runtime state | `GameSession` | Hold the current `Board` and one shared `ProfileManager`. |
+| Shared runtime state | `GameSession` | Hold the current `Board`, one shared `ProfileManager`, a timer and the active profile's cached settings. |
 | Profile management | `ProfileManager`, `Profile` | Maintain stable player identities, the registry and the session-only active selection. |
 | Text persistence | `Storage` | Read/write UTF-8 text; do not interpret saved games or calculate statistics. |
 
@@ -50,7 +117,9 @@ The implementation separates input coordination, command construction, shared st
 
 *Figure 1. Selected members and relationships of the profile component. Solid directed associations denote retained references; dashed dependencies denote use. ProfileStartup and Storage expose static operations. Multiplicities show one manager and one current board per session, and zero or more profiles in the registry. This is a focused diagram, not the complete application class model.*
 
-A `Profile` is immutable: its ID and name are final. Renaming replaces the profile object in the manager's map while preserving its UUID. The active selection stores the ID rather than an old object reference, so subsequent lookups obtain the renamed profile. Consumers should similarly obtain the current profile when needed instead of caching an old display-name object.
+A `Profile` has an immutable ID and display name, but its `Stats` object is mutable; the whole object is therefore not immutable. The diagram shows selected identity members and omits statistics, timer and settings details.
+
+`ProfileManager.renameProfile` replaces the profile object while preserving its UUID. The active selection stores the ID, so subsequent lookups obtain the renamed profile. Consumers should obtain the current profile when needed rather than cache an old object. The current replacement constructs fresh statistics: preserving statistics is still required before exposing rename as an in-game command.
 
 `GameSession` holds one replaceable board reference. Following `replaceBoard(validatedBoard)`, the next command receives the replacement through `getBoard()`. Replacement itself does not validate saved-game contents, handle unsaved progress or update timers. Those operations remain the responsibility of the calling feature.
 
@@ -75,20 +144,20 @@ For each command on an input line (a line may chain several commands, see [Gamep
 Dispatch follows this order:
 
 1. If a matching lowercase key exists in the feature registry, invoke its `Function<String[], Command>` factory with the argument tokens, excluding the command name.
-2. Otherwise, handle built-in `help`, `exit`, `new` and `board` commands, rejecting extra arguments. (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
+2. Otherwise, handle built-in `help`, `exit` and `board` without arguments, or `new [easy|medium|hard]`. Plain `new` defaults to easy. (`clear` has a commented-out branch; see [The clear command](#the-clear-command-temporarily-disabled).)
 3. For `r`, `f` and `u`, validate two integer coordinates against separate row/column limits, convert from one-based input to zero-based indices, and invoke the registered coordinate factory.
 
 Unknown commands and invalid arguments produce `IllegalArgumentException` messages. The loop displays the message and continues. Factories construct commands; they must not mutate gameplay or perform persistence as a parsing side effect.
 
 ![Sequence diagram for parsing and executing the existing flag command](images/zack-command-sequence.svg)
 
-*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters and the internals of flagging are omitted to keep the diagram focused. The call to parse represents the invocation through the loop's parsing function. Dashed arrows are returns; the command instance begins at its creation message.*
+*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters, the loop's game-over checks and the internals of flagging are omitted to keep the diagram focused. The call to parse represents the invocation through the loop's parsing function. Dashed arrows are returns; the command instance begins at its creation message.*
 
-The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A false result continues the loop; a true result ends it. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
+The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A true result ends the loop. Otherwise, it proceeds to the next segment or input line, except that a transition to a finished game skips the remaining segments on that line. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
 
-Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. The feature registry is intentionally empty in this baseline: the extension mechanism is implemented, but teammates' new commands have not been registered yet.
+Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. The registry currently contains `stats`, `leaderboard`, `save`, `load`, `settings`, `saves`, `delete`, `exit` and `new`. Coordinate commands `r`, `f` and `u` use a separate registry. One `SaveTracker` is shared by the relevant factories; constructing a tracker per command would lose the saved-position and confirmation state.
 
-Feature registrations take precedence over built-ins. For example, registering `new` would take over both `new easy` and plain `new`, so its factory must define both cases. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
+Feature registrations take precedence over built-ins. For example, the registered `new` factory handles both `new easy` and plain `new`, and supplies the session to `NewGameCommand`. The registered `exit` supplies the shared save tracker, while the fallback exit constructor remains immediate for legacy callers. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
 
 #### Defensive checks and error boundaries
 
@@ -96,9 +165,9 @@ User input is checked with ordinary conditionals and exceptions, not assertions.
 
 Session/profile preconditions also have distinct meanings: `ProfileManager.getActiveProfile()` returns an `Optional`, while `GameSession.getActiveProfile()` throws `IllegalStateException` if startup selection was omitted. Session construction and board replacement reject null references.
 
-The application logs session start/end at INFO and command dispatch/rejected input at FINE. It does not log complete user command lines for these dispatch messages. Startup registry read failures are reported without replacing the registry. Because `execute(Board)` does not declare checked I/O exceptions, future file-based commands must handle their own `IOException` and must not report success after a failed write.
+The application logs session start/end at INFO and command dispatch/rejected input at FINE. It does not log complete user command lines for these dispatch messages. Startup registry read failures are reported without replacing the registry. Because `execute(Board)` does not declare checked I/O exceptions, file-based commands must handle their own `IOException` and must not report success after a failed write.
 
-EOF currently ends the game loop directly; it does not execute an exit command. Therefore, a future override of `exit` alone will not implement EOF progress-loss handling.
+EOF currently ends the game loop directly; it does not execute an exit command. Consequently, the registered exit command's unsaved-progress check does not protect EOF.
 
 #### Design decisions and alternatives
 
@@ -121,7 +190,15 @@ The automated tests separate parser behaviour, startup interaction and file-syst
 
 Run `./gradlew clean build` (Windows: `.\gradlew.bat clean build`) before submitting changes. The rectangular routing test checks the parser/session adapter; it is not evidence that all Board algorithms already support rectangular games.
 
-This foundation does not yet supply in-game profile create/select/rename/delete commands, deletion confirmations, unsaved-game protection, saved-game restoration, statistics updates or difficulty presets. The dimension-aware production path currently reads the rectangular grid's dimensions through GameSession; legacy parser overloads still use `Board.SIZE`. Later features must update the relevant integration points and their documentation when behaviour changes.
+The current integration has the following boundaries:
+
+- Startup supports profile creation and selection; in-game `profile` commands and their confirmation policies remain unfinished.
+- The manager API can rename and delete inactive profiles, but rename does not preserve the current in-memory statistics, and deletion retains feature files.
+- The production parser receives the current session dimensions for each command. Legacy parser overloads use the easy preset's dimensions and should not be used for a variable-size session.
+- `load` validates a replacement board and checks unsaved progress before installing it; `new` currently replaces the board contents without that confirmation.
+- EOF bypasses the exit command. Adding a runtime profile switch must also explicitly handle unsaved progress and reset or restore the appropriate timer state.
+
+These are implementation limits, not completed guarantees. Keep this section and the manual checks updated when those behaviours change.
 
 See [the integration contract](ProfileIntegration.md) for the factory interface and ownership boundaries. Other team members should add their own implementation sections alongside this one.
 
@@ -130,6 +207,24 @@ See [the integration contract](ProfileIntegration.md) for the factory interface 
 * A new `Difficulty` enum manages the standard presets: EASY (9x9, 10 mines), MEDIUM (16x16, 40 mines), and HARD (16x30, 99 mines).
 * `Parser.java` and `NewGameCommand.java` were updated to route difficulty arguments (e.g., `new hard`) to generate the correct board.
 * The `copyStateFrom()` method allows the active `GameSession` to seamlessly adopt the new board dimensions without breaking the main game loop.
+
+### Statistics and Leaderboard Feature
+
+The statistics module tracks performance in the active profile's in-memory `Stats` object. The current implementation does not persist these statistics across application launches.
+
+#### Architecture and Components
+
+- **`Stats` Model**: Maintains counts for wins, losses, current win streaks, maximum win streaks, and a historical list of completion times.
+- **`GameTimer`**: Tracks elapsed duration using wall-clock millisecond timestamps (`System.currentTimeMillis()`). Commands start, stop or restore it; constructing a session alone does not start it.
+- **Persistence boundary**: `profiles.txt` stores profile IDs and names, not statistics. Each constructed `Profile` currently creates a fresh `Stats`. A future statistics file needs its own format, validation and load/save integration.
+
+#### Command Summary & Syntax
+
+| Command | Format | Description | Example |
+| :--- | :--- | :--- | :--- |
+| **Stats** | `stats` | Displays wins, losses, win rate, streaks and the fastest-time field for the active profile. | `stats` |
+| **Stats Clear** | `stats clear` | Resets all recorded wins, losses, streaks, and times for the active profile. | `stats clear` |
+| **Leaderboard** | `leaderboard` | Displays registered profiles and their in-memory wins, losses and win rates. | `leaderboard` |
 
 ### Saving and loading games
 
@@ -167,7 +262,7 @@ Figure 4 shows what happens when the player types `save trip`.
 
 1. The parser passes `["trip"]` to `SaveCommand.parse`, which checks and lowercases the name. The name may contain only letters, digits, `_` and `-`, so it can never contain `/` or `..` and escape the saves folder. Windows-reserved names such as `con` and `nul` are also rejected.
 2. `execute` refuses finished games, since there is nothing left to continue and the result is already recorded in the statistics.
-3. `SaveStore` asks `GameSaveCodec.encode` for the file contents, then writes them with `Storage.writeLines`. `Storage` writes to a temporary file first, so a failed write leaves any previous save intact.
+3. `SaveStore` asks `GameSaveCodec.encode` for the file contents, then writes them with `Storage.writeLines`. `Storage` writes to a temporary file first and attempts atomic replacement. Its fallback on file systems without atomic moves is not a universal guarantee that the old save survives every replacement failure.
 4. Only after the write succeeds does `SaveCommand` call `tracker.markSaved`. If the write throws an `IOException`, the command prints the error and does **not** mark the game as saved, so the exit warning still protects the player's progress.
 
 Plain `save` (no name) re-saves to the name this game was last saved to or loaded from, which `SaveTracker.getCurrentSaveName` provides.
@@ -339,11 +434,11 @@ Command objects are created fresh for every input line, so the remembered name l
 
 `ClearCommand` prints the ANSI sequence `ESC[H ESC[2J ESC[3J` (move the cursor home, erase the screen, erase the scrollback) and flushes. It does not touch the game state and does not reprint the board.
 
-The command is currently disabled in three places. To re-enable it, uncomment all three:
+The command is currently disabled in three places. To re-enable it:
 
-- the `case "clear"` branch in `Parser.parse`,
-- the `clear` line in `HelpCommand`,
-- `@Disabled` on `clear_printsAnsiClearSequence_andKeepsBoard` in `ClearAndHelpCommandTest`.
+- Uncomment the `case "clear"` branch in `Parser.parse`.
+- Uncomment the `clear` line in `HelpCommand`.
+- Remove `@Disabled` from `clear_printsAnsiClearSequence_andKeepsBoard` in `ClearAndHelpCommandTest`, then run the test.
 
 Terminals that understand ANSI codes clear correctly. Some IDE consoles ignore the codes, in which case nothing visible happens.
 
@@ -381,30 +476,108 @@ The tests share setup (a temporary profile folder, captured output, a script run
 - Safeclick changes apply at the next first reveal, not to a game already in progress.
 - `UserGuide.md` does not yet describe these commands.
 
-## Product scope
-### Target user profile
-
-{Describe the target user profile}
-
-### Value proposition
-
-{Describe the value proposition: what problem does it solve?}
-
-## User Stories
-
-|Version| As a ... | I want to ... | So that I can ...|
-|--------|----------|---------------|------------------|
-|v1.0|new user|see usage instructions|refer to them when I forget how to use the application|
-|v2.0|user|find a to-do item by name|locate a to-do without having to go through the entire list|
-
 ## Non-Functional Requirements
 
-{Give non-functional requirements}
+The following are development targets. A target is not evidence that every operating system or failure mode has been tested.
+
+| Area | Requirement and verification |
+|---|---|
+| Runtime | The application and tests use Java 25. Verify the packaged JAR with Java 25, not only through an IDE. |
+| Interface | Core play is accessible through text commands in a terminal. User-facing coordinates are one-based. |
+| Offline operation | After obtaining the JAR and Java runtime, gameplay uses local files and requires no remote service. Build dependency downloads are separate. |
+| Input handling | Invalid command syntax or coordinates produce an explanatory message and leave the input loop usable. These checks must work without assertions. |
+| Persistence | Persistent files use UTF-8 text. Registry and save-file readers validate their own formats before accepting data. File failures must not be reported as successful saves. |
+| Data separation | Saved games and settings use the profile's stable UUID directory. Display-name changes must not alter those paths. |
+| Maintainability | Submitted Java changes should pass the repository's JUnit tests and Checkstyle checks. File-related tests use isolated temporary directories. |
+| Usage limits | One application instance accesses a data directory at a time. Concurrent writers, authenticated accounts and crash recovery across multiple files are outside the current design. |
 
 ## Glossary
 
-* *glossary item* - Definition
+| Term | Meaning |
+|---|---|
+| Board / cell | The rectangular grid / one position in that grid. A cell may contain a mine and may be revealed or flagged. |
+| Reveal | Open a cell. A safe cell displays its adjacent-mine count; revealing a mine loses the game. |
+| Flag | Mark a suspected mine without revealing it. A flag is a player's guess, not proof that a mine is present. |
+| Flood fill | Expansion from a blank cell to connected blank cells and their numbered boundary. |
+| Safeclick | The setting controlling protection for the first reveal of a game. |
+| Profile / UUID | A local player's record / the stable identifier used for that player's data paths. |
+| GameSession | Shared runtime access to the current board, profile manager, timer and settings. |
+| Command factory | A function that validates arguments and constructs a command for later execution. |
+| Unsaved progress | Board changes not matching the save tracker's last saved/loaded position; see the save/load section for the exact rule. |
+| EOF | End of input. The current loop exits directly when its input stream ends. |
 
 ## Instructions for manual testing
 
-{Give instructions on how to do a manual product testing e.g., how to load sample data to be used for testing}
+### Preparation
+
+Build the JAR as described in [Setting up and verification](#setting-up-and-verification).
+Copy it into a separate empty folder, open a terminal in that folder and run `java -ea -jar jaweeper.jar`.
+Keep using that working directory when testing persistence across launches.
+The following are repeatable checks and expected outcomes, not a record of tests already executed.
+
+### Startup and profile persistence
+
+1. At the first startup prompt, enter `create DG Tester`. Expect a selected profile and a fresh board.
+2. Enter `exit` before making a move. Relaunch from the same directory; expect `DG Tester` in the profile list.
+3. Enter `create dg tester`. Expect a duplicate-name error and another startup prompt.
+4. Enter `select 999`. Expect an invalid-selection message and another prompt.
+5. Select the number actually shown beside `DG Tester`. Expect entry into the game.
+6. Check that `data/profiles.txt` contains a `profiles-v1` header and a UUID/name record.
+   The numbered startup choice is not written as the profile's identity.
+
+For a registry-corruption check, use a second isolated test folder.
+Create and exit a test profile, then change only that folder's registry header to `invalid-header`.
+Relaunch: expect a registry error and no replacement registry. Do not run this check against real player data.
+
+### Parser, dimensions and command chaining
+
+Run these commands in order after selecting a test profile:
+
+| Input | Expected outcome |
+|---|---|
+| `new hard` | A 16-row, 30-column board. |
+| `f 16 30` then `board` | The bottom-right cell is flagged. |
+| `u 16 30` then `board` | That flag is removed. |
+| `r 0 1`, `r 17 1`, `r 1 31`, `r abc 1` | Each input is rejected; the process continues without revealing a cell. |
+| `new impossible` | A usage error; the current board remains available. |
+| `new easy; f 9 9; board` | A 9-by-9 board with its bottom-right cell flagged, demonstrating parsing after the earlier board change. |
+| `unknown; board` | An unknown-command message followed by the board, demonstrating that a failed segment does not cancel the rest. |
+
+Board generation is random. Check dimensions, flags and state changes rather than an exact mine layout.
+Use controlled boards in unit tests for deterministic win, loss and flood-fill cases.
+
+### Save, restore and unsaved-progress protection
+
+1. Enter `new easy`, `f 1 1`, then `save dg-check`. Expect a success message.
+2. Enter `u 1 1`, then `load dg-check`. Expect an unsaved-progress warning; the unflagged board should remain.
+3. Repeat `load dg-check` without changing the board. Expect the saved board with the flag at `1 1`.
+4. Enter `saves`. Expect `dg-check` in the list.
+5. Enter `load no-such-dg-save` with a name absent from the list. Expect an error and no board replacement.
+6. Enter `u 1 1`, then `exit`. Expect a warning and a live command prompt.
+7. Repeat `exit` without changing the board. Expect the application to close.
+8. Relaunch, select the same profile and enter `load dg-check`. Expect the saved flag to return.
+
+These checks exercise the registered production commands. They do not imply that `new` or EOF has the same unsaved-progress protection.
+
+### Per-profile settings
+
+1. With `DG Tester` selected, enter `settings safeclick off`, then `settings`. Expect off.
+2. Exit, relaunch, select the same profile and enter `settings`. Expect off again.
+3. Exit and relaunch; create a second profile named `DG Other`. Enter `settings`. Expect the default on.
+4. Enter `settings safeclick maybe`. Expect a usage error and the existing setting unchanged.
+
+### Recording results and remaining checks
+
+For each failed check, record the commit/JAR version, Java version, operating system, exact input sequence,
+expected result and observed output. Preserve only the isolated test data needed to reproduce it.
+The feature owners should extend these checks for timing, ranking, finished-game behaviour and malformed saved-game files.
+In-game profile commands and persistent statistics need additional tests when those features are implemented.
+
+## Acknowledgements
+
+- Project starting point: the [NUS CS2113 tP repository](https://github.com/NUS-CS2113-AY2627-S1/tp).
+- Build tooling: [Gradle](https://gradle.org/) and the [Shadow plugin](https://gradleup.com/shadow/).
+- Automated testing: [JUnit](https://junit.org/).
+- Java style checks: [Checkstyle](https://checkstyle.org/).
+
+Feature owners should add specific attribution here for any other reused or adapted code, diagrams or documentation.

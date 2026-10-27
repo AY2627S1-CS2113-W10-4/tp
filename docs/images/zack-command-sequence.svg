@@ -72,5 +72,5 @@
 <text x="110" y="741" class="" >isExit()</text>
 <path d="M990,785 H100" class="line dashed" marker-end="url(#open)"/>
 <text x="110" y="776" class="" >false</text>
-<text x="25" y="856" class="small" >Continue with the next input line. Scanner, logging and lambda adapter calls are omitted.</text>
+<text x="25" y="856" class="small" >Continue with the next segment or input line. Input handling and game-over checks are omitted.</text>
 </svg>
