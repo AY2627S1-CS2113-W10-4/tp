@@ -50,6 +50,11 @@ public class Parser {
             return new ExitCommand();
         case "new":
             return parseNewCommand(words);
+        // @@author ProNoob116
+        case "undo":
+            requireNoArguments(words);
+            return new UndoCommand(null);
+        // @@author
         case "board":
             requireNoArguments(words);
             return new PrintBoardCommand();
@@ -67,6 +72,11 @@ public class Parser {
     }
 
     private static Command parseNewCommand(String[] words) {
+        // @@author ProNoob116
+        if (words.length >= 2 && "custom".equalsIgnoreCase(words[1])) {
+            return parseCustomGame(words);
+        }
+        // @@author
         if (words.length == 1) {
             return new NewGameCommand(Difficulty.EASY);
         } else if (words.length == 2) {
@@ -85,6 +95,16 @@ public class Parser {
             throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
         }
     }
+
+    // @@author ProNoob116
+    /**
+     * Parses {@code new custom ROWS COLS MINES} into a custom-game command.
+     */
+    private static Command parseCustomGame(String[] words) {
+        String[] arguments = Arrays.copyOfRange(words, 1, words.length);
+        return CustomGameCommand.parse(arguments, null);
+    }
+    // @@author
 
     private static void requireNoArguments(String[] words) {
         if (words.length != 1) {

@@ -55,8 +55,10 @@ public class Jaweeper {
         Map<String, BiFunction<Integer, Integer, Command>> commands = new HashMap<>();
 
         commands.put("r", (row, col) -> new RevealCommand(session, row, col));
-        commands.put("f", FlagCommand::new);
-        commands.put("u", UnflagCommand::new);
+        // @@author ProNoob116
+        commands.put("f", (row, col) -> new FlagCommand(session, row, col));
+        commands.put("u", (row, col) -> new UnflagCommand(session, row, col));
+        // @@author
 
         return commands;
     }
@@ -71,6 +73,7 @@ public class Jaweeper {
         // Feature owners supply factories; Zack coordinates their registration here.
         // @@author ProNoob116
         commands.put("hint", HintCommand::create);
+        commands.put("undo", args -> UndoCommand.parse(args, session));
         // @@author
 
         commands.put("stats", args -> {
@@ -113,6 +116,11 @@ public class Jaweeper {
         });
 
         commands.put("new", args -> {
+            // @@author ProNoob116
+            if (args.length > 0 && "custom".equalsIgnoreCase(args[0])) {
+                return CustomGameCommand.parse(args, session);
+            }
+            // @@author
             Difficulty difficulty = Difficulty.EASY;
             if (args.length == 1) {
                 String diffStr = args[0].toLowerCase(Locale.ROOT);
