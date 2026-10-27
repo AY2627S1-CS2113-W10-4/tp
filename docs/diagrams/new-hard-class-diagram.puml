@@ -1,0 +1,70 @@
+@startuml new-hard-class-diagram
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title New hard command
+
+enum Difficulty {
+    EASY
+    MEDIUM
+    HARD
+    + rows : int
+    + cols : int
+    + mines : int
+}
+
+abstract class Command {
+    + {abstract} execute(board : Board)
+    + isExit() : boolean
+}
+
+class NewGameCommand {
+    - difficulty : Difficulty
+    + NewGameCommand()
+    + NewGameCommand(difficulty : Difficulty)
+    + execute(board : Board)
+}
+
+class Parser {
+    + {static} parse(input, coordinateCommands, featureCommands, rows, columns) : Command
+    - {static} parseNewCommand(words : String[]) : Command
+}
+
+class Board {
+    - rows : int
+    - cols : int
+    - totalMines : int
+    + grid : Cell[][]
+    - gameState : GameState
+    - isFirstMove : boolean
+    + Board()
+    + Board(rows : int, cols : int, totalMines : int)
+    + copyStateFrom(freshBoard : Board)
+    + getRows() : int
+    + getCols() : int
+    + getTotalMines() : int
+    + printBoard()
+    + setGameState(gameState : GameState)
+}
+
+class GameSession {
+    - board : Board
+    + getBoard() : Board
+}
+
+class Cell
+enum GameState {
+    IN_PROGRESS
+    WON
+    LOST
+}
+
+NewGameCommand -up-|> Command
+NewGameCommand --> "1" Difficulty
+NewGameCommand ..> Board : creates and copyStateFrom
+Parser ..> NewGameCommand : creates
+Parser ..> Difficulty
+Board --> "rows * cols" Cell
+Board --> GameState
+Board ..> Difficulty : no-arg constructor uses EASY
+GameSession --> "1" Board : same instance mutated by new hard
+@enduml
