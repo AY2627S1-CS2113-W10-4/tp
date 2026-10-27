@@ -3,11 +3,10 @@ package seedu.jaweeper;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+// @@author ProNoob116
 /**
  * Suggests one hidden cell that is safe given the revealed numbers and flags.
  * The suggestion is printed and the board is left unchanged.
- *
- * @@author ProNoob116
  */
 public class HintCommand extends Command {
     private static final Logger logger = Logger.getLogger(HintCommand.class.getName());
@@ -153,3 +152,4 @@ public class HintCommand extends Command {
         }
     }
 }
+// @@author
