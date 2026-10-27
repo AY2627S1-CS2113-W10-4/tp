@@ -1,0 +1,36 @@
+@startuml new-hard-sequence-diagram
+title Successful new hard
+hide footbox
+
+participant "Jaweeper.runLoop" as Loop
+participant Parser
+participant NewGameCommand
+participant "Difficulty.HARD" as Hard
+participant "existing Board" as Board
+participant "new Board(16, 30, 99)" as Fresh
+
+Loop -> Parser : parse("new hard", empty feature map, dimensions)
+Parser -> Parser : no feature factory named new
+Parser -> Parser : parseNewCommand matches hard
+Parser -> NewGameCommand : new NewGameCommand(HARD)
+NewGameCommand --> Hard : rows = 16, cols = 30, mines = 99
+Parser --> Loop : command
+
+Loop -> NewGameCommand : execute(session board)
+NewGameCommand -> Board : setGameState(IN_PROGRESS)
+NewGameCommand -> Fresh : new Board(16, 30, 99)
+activate Fresh
+Fresh -> Fresh : place 99 mines and calculate adjacencies
+NewGameCommand -> Board : copyStateFrom(fresh)
+note right of Board
+  Copies rows, cols, totalMines,
+  grid, and isFirstMove.
+  GameSession keeps this Board.
+end note
+NewGameCommand -> Board : print "New hard game started."
+NewGameCommand -> Board : printBoard()
+NewGameCommand --> Loop
+Loop -> NewGameCommand : isExit()
+NewGameCommand --> Loop : false
+Loop -> Loop : prompt for the next command
+@enduml

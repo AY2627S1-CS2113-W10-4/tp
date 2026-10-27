@@ -16,7 +16,6 @@ public class Board {
     public Cell[][] grid;
 
     // 2. Private fields next
-
     private int rows;
     private int cols;
     private int totalMines;

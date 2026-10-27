@@ -75,7 +75,7 @@ For each command on an input line (a line may chain several commands, see [Gamep
 Dispatch follows this order:
 
 1. If a matching lowercase key exists in the feature registry, invoke its `Function<String[], Command>` factory with the argument tokens, excluding the command name.
-2. Otherwise, handle built-in `help`, `exit`, `new` and `board` commands, rejecting extra arguments. (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
+2. Otherwise, handle built-in `help`, `exit`, `new` and `board`. `help`, `exit` and `board` reject extra arguments. `new` accepts an optional difficulty word, described under [Difficulty levels and dynamic boards](#difficulty-levels-and-dynamic-boards). (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
 3. For `r`, `f` and `u`, validate two integer coordinates against separate row/column limits, convert from one-based input to zero-based indices, and invoke the registered coordinate factory.
 
 Unknown commands and invalid arguments produce `IllegalArgumentException` messages. The loop displays the message and continues. Factories construct commands; they must not mutate gameplay or perform persistence as a parsing side effect.
@@ -86,7 +86,7 @@ Unknown commands and invalid arguments produce `IllegalArgumentException` messag
 
 The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A false result continues the loop; a true result ends it. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
 
-Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. The feature registry is intentionally empty in this baseline: the extension mechanism is implemented, but teammates' new commands have not been registered yet.
+Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. `hint` is registered there and does not replace a built-in command.
 
 Feature registrations take precedence over built-ins. For example, registering `new` would take over both `new easy` and plain `new`, so its factory must define both cases. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
 
@@ -121,15 +121,164 @@ The automated tests separate parser behaviour, startup interaction and file-syst
 
 Run `./gradlew clean build` (Windows: `.\gradlew.bat clean build`) before submitting changes. The rectangular routing test checks the parser/session adapter; it is not evidence that all Board algorithms already support rectangular games.
 
-This foundation does not yet supply in-game profile create/select/rename/delete commands, deletion confirmations, unsaved-game protection, saved-game restoration, statistics updates or difficulty presets. The dimension-aware production path currently reads the rectangular grid's dimensions through GameSession; legacy parser overloads still use `Board.SIZE`. Later features must update the relevant integration points and their documentation when behaviour changes.
+This foundation does not yet supply in-game profile create/select/rename/delete commands, deletion confirmations, unsaved-game protection, saved-game restoration or statistics updates. Difficulty presets and `hint` are described in the next section. The session loop reads the current board's row and column counts through `GameSession`. Legacy `Parser.parse` overloads validate coordinates against the easy preset. Later features must update the relevant integration points and their documentation when behaviour changes.
 
 See [the integration contract](ProfileIntegration.md) for the factory interface and ownership boundaries. Other team members should add their own implementation sections alongside this one.
 
-### Difficulty Levels and Dynamic Boards
-* The `Board` class was refactored to support dynamic dimensions, replacing the hardcoded 9x9 grid constants.
-* A new `Difficulty` enum manages the standard presets: EASY (9x9, 10 mines), MEDIUM (16x16, 40 mines), and HARD (16x30, 99 mines).
-* `Parser.java` and `NewGameCommand.java` were updated to route difficulty arguments (e.g., `new hard`) to generate the correct board.
-* The `copyStateFrom()` method allows the active `GameSession` to seamlessly adopt the new board dimensions without breaking the main game loop.
+### Difficulty levels and dynamic boards
+
+**Maintainer:** Pranav (ProNoob116).
+
+A game is no longer fixed at 9×9 with 10 mines. `Board` stores `rows`, `cols` and `totalMines`, and mine placement, adjacency counts, flood fill, victory checking and printing all use those values. The public `Board.SIZE` and `Board.MINES` constants remain only so existing tests can still describe the easy board. New code should use `getRows()`, `getCols()` and `getTotalMines()`.
+
+`Difficulty` holds the three presets:
+
+| Preset | Command | Rows | Columns | Mines |
+|---|---|---|---|---|
+| `EASY` | `new` or `new easy` | 9 | 9 | 10 |
+| `MEDIUM` | `new medium` | 16 | 16 | 40 |
+| `HARD` | `new hard` | 16 | 30 | 99 |
+
+The no-argument `Board` constructor delegates to `Difficulty.EASY`. `new` with no difficulty word does the same.
+
+#### Class structure
+
+`Parser` recognises the difficulty word and constructs a `NewGameCommand`. That command stores one `Difficulty` and, on execution, builds a sized `Board`, then copies the new grid into the board object the session already holds. `GameSession` therefore keeps the same `Board` reference. The next command sees the new dimensions through `getRowCount()` and `getColumnCount()`, which read `grid.length` and `grid[0].length`.
+
+```plantuml
+@startuml new-hard-class-diagram
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title New hard command
+
+enum Difficulty {
+    EASY
+    MEDIUM
+    HARD
+    + rows : int
+    + cols : int
+    + mines : int
+}
+
+abstract class Command {
+    + {abstract} execute(board : Board)
+    + isExit() : boolean
+}
+
+class NewGameCommand {
+    - difficulty : Difficulty
+    + NewGameCommand()
+    + NewGameCommand(difficulty : Difficulty)
+    + execute(board : Board)
+}
+
+class Parser {
+    + {static} parse(input, coordinateCommands, featureCommands, rows, columns) : Command
+    - {static} parseNewCommand(words : String[]) : Command
+}
+
+class Board {
+    - rows : int
+    - cols : int
+    - totalMines : int
+    + grid : Cell[][]
+    - gameState : GameState
+    - isFirstMove : boolean
+    + Board()
+    + Board(rows : int, cols : int, totalMines : int)
+    + copyStateFrom(freshBoard : Board)
+    + getRows() : int
+    + getCols() : int
+    + getTotalMines() : int
+    + printBoard()
+    + setGameState(gameState : GameState)
+}
+
+class GameSession {
+    - board : Board
+    + getBoard() : Board
+}
+
+class Cell
+enum GameState {
+    IN_PROGRESS
+    WON
+    LOST
+}
+
+NewGameCommand -up-|> Command
+NewGameCommand --> "1" Difficulty
+NewGameCommand ..> Board : creates and copyStateFrom
+Parser ..> NewGameCommand : creates
+Parser ..> Difficulty
+Board --> "rows * cols" Cell
+Board --> GameState
+Board ..> Difficulty : no-arg constructor uses EASY
+GameSession --> "1" Board : same instance mutated by new hard
+@enduml
+```
+
+*Figure 3. Classes involved in `new hard`. The source file is [diagrams/new-hard-class-diagram.puml](diagrams/new-hard-class-diagram.puml). Solid arrows are retained associations. Dashed arrows are use. `GameSession` keeps one `Board`; `new hard` changes that object instead of replacing the session's reference.*
+
+#### Processing `new hard`
+
+`new hard` is a built-in command, not a feature-factory command. The loop still passes the current dimensions into `Parser.parse`, but those dimensions are used only for `r`, `f` and `u`. They do not choose the size of the new game.
+
+1. The feature map is checked first. There is no factory named `new`, so parsing continues to the built-in switch. A teammate who later registers `new` takes over `new hard` as well and must handle the difficulty word in that factory.
+2. `parseNewCommand` accepts either one token (`new`) or two tokens. The second token is lowercased with `Locale.ROOT`. `hard` selects `Difficulty.HARD` and returns `new NewGameCommand(Difficulty.HARD)`. Any other word, or a third token, throws `IllegalArgumentException` with `Usage: new [easy|medium|hard]`. The loop prints that message and does not change the board.
+3. `execute` sets the existing board's state to `GameState.IN_PROGRESS`, then constructs `new Board(16, 30, 99)`. That constructor allocates the grid, places 99 mines and calculates adjacencies. The first reveal on this board is still protected by the existing safe-first-click behaviour.
+4. `copyStateFrom` copies `rows`, `cols`, `totalMines`, `grid` and `isFirstMove` into the session's board. It does not call `GameSession.replaceBoard`.
+5. The command prints `New hard game started.` and `printBoard()`. The header reports `Remaining Mines: 99`, and the grid is labelled through row 16 and column 30.
+6. `isExit()` is false, so the loop prompts again. Later coordinate commands are checked against the new grid size.
+
+```plantuml
+@startuml new-hard-sequence-diagram
+title Successful new hard
+hide footbox
+
+participant "Jaweeper.runLoop" as Loop
+participant Parser
+participant NewGameCommand
+participant "Difficulty.HARD" as Hard
+participant "existing Board" as Board
+participant "new Board(16, 30, 99)" as Fresh
+
+Loop -> Parser : parse("new hard", empty feature map, dimensions)
+Parser -> Parser : no feature factory named new
+Parser -> Parser : parseNewCommand matches hard
+Parser -> NewGameCommand : new NewGameCommand(HARD)
+NewGameCommand --> Hard : rows = 16, cols = 30, mines = 99
+Parser --> Loop : command
+
+Loop -> NewGameCommand : execute(session board)
+NewGameCommand -> Board : setGameState(IN_PROGRESS)
+NewGameCommand -> Fresh : new Board(16, 30, 99)
+activate Fresh
+Fresh -> Fresh : place 99 mines and calculate adjacencies
+NewGameCommand -> Board : copyStateFrom(fresh)
+note right of Board
+  Copies rows, cols, totalMines,
+  grid, and isFirstMove.
+  GameSession keeps this Board.
+end note
+NewGameCommand -> Board : print "New hard game started."
+NewGameCommand -> Board : printBoard()
+NewGameCommand --> Loop
+Loop -> NewGameCommand : isExit()
+NewGameCommand --> Loop : false
+Loop -> Loop : prompt for the next command
+@enduml
+```
+
+*Figure 4. Successful processing of `new hard`. The source file is [diagrams/new-hard-sequence-diagram.puml](diagrams/new-hard-sequence-diagram.puml). Scanner reads, logging and the mine-placement loops are omitted. Dashed arrows are returns.*
+
+`new easy` and a bare `new` follow the same path with `Difficulty.EASY` and the message `New easy game started.` `new medium` uses `Difficulty.MEDIUM` and prints `New medium game started.`
+
+#### Hint command
+
+`hint` is separate from difficulty selection. `Jaweeper.createFeatureCommands` registers it under the lowercase name `hint`, so the feature factory runs before the built-in switch and the command cannot be confused with `new`. `HintCommand.create` rejects extra arguments with `Usage: hint`.
+
+`execute` does not change the board. If the game is already over, it prints `The game is over. Type 'new' to start a new game.` Otherwise it scans revealed safe cells. When a cell's adjacent flag count equals its number, every hidden unflagged neighbour is treated as safe, and the command prints the first such cell in one-based coordinates, for example `Try revealing cell (4, 7).` If no such cell exists, it prints `No safe cell can be deduced yet. Reveal more cells.` An empty, ragged or incomplete grid throws `IllegalArgumentException`; the command catches it, prints the message and returns, so the input loop continues. Assertions check that a chosen hint is inside the current dimensions and refers to a hidden, unflagged cell. They do not claim the cell is free of a mine, because that depends on the player's flags being correct.
 
 ### Saving and loading games
 
