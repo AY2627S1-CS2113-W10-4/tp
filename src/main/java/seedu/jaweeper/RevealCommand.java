@@ -7,15 +7,24 @@ import java.util.logging.Logger;
  * Reveals a cell on the board and ends the game if the cell is a mine.
  */
 public class RevealCommand extends Command {
-    private static final Logger logger = Logger.getLogger(RevealCommand.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(RevealCommand.class.getName());
 
+    private final GameSession session;
     private final int row;
     private final int col;
 
     /**
-     * Creates a command that reveals the cell at the given zero-based position.
+     * Legacy constructor for coordinate-only usage.
      */
     public RevealCommand(int row, int col) {
+        this(null, row, col);
+    }
+
+    /**
+     * Constructs a RevealCommand with session, row, and column context.
+     */
+    public RevealCommand(GameSession session, int row, int col) {
+        this.session = session;
         this.row = row;
         this.col = col;
     }
@@ -29,12 +38,12 @@ public class RevealCommand extends Command {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before revealing";
 
-        logger.log(Level.FINE, "Reveal requested at (" + row + ", " + col + ")");
+        LOGGER.log(Level.FINE, "Reveal requested at (" + row + ", " + col + ")");
 
         try {
             checkCanReveal(board);
         } catch (IllegalStateException | IllegalArgumentException exception) {
-            logger.log(Level.INFO, "Reveal rejected: " + exception.getMessage());
+            LOGGER.log(Level.INFO, "Reveal rejected: " + exception.getMessage());
             System.out.println(exception.getMessage());
             return;
         }
@@ -43,7 +52,12 @@ public class RevealCommand extends Command {
         assert target != null : "Cell in grid must not be null";
 
         // Classic Minesweeper: the first reveal of a game is never a mine and opens a blank area.
-        board.ensureSafeFirstClick(row, col);
+        // The player can switch this off with 'settings safeclick off'.
+        if (session == null || session.isSafeClickEnabled()) {
+            board.ensureSafeFirstClick(row, col);
+        } else {
+            board.skipSafeFirstClick();
+        }
 
         if (target.isMine) {
             revealMine(board, target);
@@ -69,17 +83,26 @@ public class RevealCommand extends Command {
     }
 
     /**
-     * Reveals a mine, marks the game as lost and prints the game over message.
+     * Reveals a mine, marks the game as lost, stops the timer, updates statistics and shows all mines.
      */
     private void revealMine(Board board, Cell target) {
         target.isRevealed = true;
         board.setGameState(GameState.LOST);
 
+        if (session != null) {
+            if (session.getGameTimer() != null) {
+                session.getGameTimer().stop();
+            }
+            session.getActiveProfile().getStats().recordLoss();
+        }
+
         assert target.isRevealed : "Mine cell should be revealed after hitting it";
         assert board.getGameState() == GameState.LOST : "Game should be lost after hitting a mine";
-        logger.log(Level.INFO, "Mine hit at (" + row + ", " + col + "); game lost");
+        LOGGER.log(Level.INFO, "Mine hit at (" + row + ", " + col + "); game lost");
 
         System.out.println("BOOM! You hit a mine at (" + (row + 1) + ", " + (col + 1) + ").");
+        // The board is drawn after the state is LOST, so every remaining mine is shown.
+        board.printBoard();
         System.out.println("========================");
         System.out.println("       GAME OVER        ");
         System.out.println("========================");
@@ -92,14 +115,24 @@ public class RevealCommand extends Command {
         board.floodFill(row, col);
 
         assert target.isRevealed : "Safe cell should be revealed after flood fill";
-        logger.log(Level.FINE, "Safe cell revealed at (" + row + ", " + col + ")");
+        LOGGER.log(Level.FINE, "Safe cell revealed at (" + row + ", " + col + ")");
 
         board.printBoard();
 
         if (board.checkVictory()) {
             board.setGameState(GameState.WON);
+
+            if (session != null) {
+                long timeTakenInSeconds = 0;
+                if (session.getGameTimer() != null) {
+                    session.getGameTimer().stop();
+                    timeTakenInSeconds = session.getGameTimer().getElapsedTimeSeconds();
+                }
+                session.getActiveProfile().getStats().recordWin(timeTakenInSeconds);
+            }
+
             assert board.getGameState() == GameState.WON : "Game should be won after victory";
-            logger.log(Level.INFO, "All safe cells revealed; game won");
+            LOGGER.log(Level.INFO, "All safe cells revealed; game won");
 
             System.out.println("========================");
             System.out.println("        VICTORY!        ");
@@ -107,4 +140,3 @@ public class RevealCommand extends Command {
         }
     }
 }
-

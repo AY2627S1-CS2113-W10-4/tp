@@ -53,13 +53,16 @@ public class Parser {
         case "board":
             requireNoArguments(words);
             return new PrintBoardCommand();
+            // case "clear":
+            //     requireNoArguments(words);
+            //     return new ClearCommand();
         case "r":
         case "f":
         case "u":
             return parseCoordinates(name, words, coordinateCommands, rows, columns);
         default:
             throw new IllegalArgumentException(
-                    "Unknown command: " + words[0] + ". Type help for usage.");
+                        "Unknown command: " + words[0] + ". Type help for usage.");
         }
     }
 

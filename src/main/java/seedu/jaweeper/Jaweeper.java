@@ -2,7 +2,10 @@ package seedu.jaweeper;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.BiFunction;
@@ -30,7 +33,7 @@ public class Jaweeper {
                 return;
             }
             GameSession session = new GameSession(new Board(), profiles);
-            run(input, session, createCoordinateCommands(), createFeatureCommands(session));
+            run(input, session, createCoordinateCommands(session), createFeatureCommands(session));
         } catch (IOException exception) {
             LOGGER.log(Level.WARNING, "Could not load the profile registry", exception);
             System.out.println("Unable to open profiles: " + exception.getMessage());
@@ -39,12 +42,19 @@ public class Jaweeper {
     }
 
     /**
-     * Registers gameplay commands with zero-based row and column arguments.
+     * Registers gameplay commands for legacy/test usage without a session.
      */
     static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands() {
+        return createCoordinateCommands(null);
+    }
+
+    /**
+     * Registers gameplay commands with zero-based row and column arguments.
+     */
+    static Map<String, BiFunction<Integer, Integer, Command>> createCoordinateCommands(GameSession session) {
         Map<String, BiFunction<Integer, Integer, Command>> commands = new HashMap<>();
 
-        commands.put("r", RevealCommand::new);
+        commands.put("r", (row, col) -> new RevealCommand(session, row, col));
         commands.put("f", FlagCommand::new);
         commands.put("u", UnflagCommand::new);
 
@@ -62,6 +72,69 @@ public class Jaweeper {
         // @@author ProNoob116
         commands.put("hint", HintCommand::create);
         // @@author
+
+        commands.put("stats", args -> {
+            if (args.length == 1 && args[0].equalsIgnoreCase("clear")) {
+                return new StatsClearCommand(session);
+            } else if (args.length == 0) {
+                return new StatsCommand(session);
+            } else {
+                throw new IllegalArgumentException("Usage: stats or stats clear");
+            }
+        });
+
+        commands.put("leaderboard", args -> {
+            if (args.length != 0) {
+                throw new IllegalArgumentException("Usage: leaderboard");
+            }
+            return new LeaderboardCommand(session);
+        });
+
+        SaveTracker saveTracker = new SaveTracker();
+        commands.put("save", args -> SaveCommand.parse(args, session, saveTracker));
+        commands.put("load", args -> LoadCommand.parse(args, session, saveTracker));
+
+        commands.put("settings", args -> SettingsCommand.parse(args, session));
+        commands.put("saves", args -> {
+            if (args.length != 0) {
+                throw new IllegalArgumentException("Usage: saves");
+            }
+            return new SavesCommand(session);
+        });
+        // One shared confirmation, so the second 'delete NAME' is recognised as a repeat.
+        DeleteCommand.Confirmation deleteConfirmation = new DeleteCommand.Confirmation();
+        commands.put("delete", args -> DeleteCommand.parse(args, session, saveTracker, deleteConfirmation));
+
+        commands.put("exit", args -> {
+            if (args.length != 0) {
+                throw new IllegalArgumentException("Usage: exit");
+            }
+            return new ExitCommand(saveTracker);
+        });
+
+        commands.put("new", args -> {
+            Difficulty difficulty = Difficulty.EASY;
+            if (args.length == 1) {
+                String diffStr = args[0].toLowerCase(Locale.ROOT);
+                switch (diffStr) {
+                case "easy":
+                    difficulty = Difficulty.EASY;
+                    break;
+                case "medium":
+                    difficulty = Difficulty.MEDIUM;
+                    break;
+                case "hard":
+                    difficulty = Difficulty.HARD;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+                }
+            } else if (args.length > 1) {
+                throw new IllegalArgumentException("Usage: new [easy|medium|hard]");
+            }
+            return new NewGameCommand(session, difficulty);
+        });
+
         return commands;
     }
 
@@ -117,9 +190,30 @@ public class Jaweeper {
                 return;
             }
 
+            if (runLine(input.nextLine(), currentBoard, parseCommand)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Runs one input line, which may chain several commands separated by ';' (for example
+     * {@code f 1 1; f 2 3}). Each command is parsed only when its turn comes, so it is checked
+     * against the board as the earlier commands left it (for instance after {@code new hard}).
+     * A command that fails prints its error and the rest of the line still runs. The one
+     * exception is a game that ends partway through the line (a win or a loss): the remaining
+     * commands are skipped with a single note instead of each complaining that the game is over.
+     *
+     * @return True if a command asked the application to exit; later commands are then skipped.
+     */
+    private static boolean runLine(String line, Supplier<Board> currentBoard,
+                                   Function<String, Command> parseCommand) {
+        List<String> segments = splitChain(line);
+        for (int index = 0; index < segments.size(); index++) {
+            String segment = segments.get(index);
             Command command;
             try {
-                command = parseCommand.apply(input.nextLine());
+                command = parseCommand.apply(segment);
             } catch (IllegalArgumentException exception) {
                 LOGGER.fine("Rejected invalid command input");
                 System.out.println(exception.getMessage());
@@ -129,6 +223,7 @@ public class Jaweeper {
             assert command != null : "Parsed command should not be null";
 
             LOGGER.log(Level.FINE, "Executing command: {0}", command.getClass().getSimpleName());
+            boolean wasGameOver = currentBoard.get().isGameOver();
             try {
                 command.execute(currentBoard.get());
             } catch (IllegalArgumentException exception) {
@@ -140,8 +235,34 @@ public class Jaweeper {
 
             if (command.isExit()) {
                 LOGGER.info("Jaweeper session ended: exit command");
-                return;
+                return true;
+            }
+
+            int remaining = segments.size() - index - 1;
+            if (!wasGameOver && currentBoard.get().isGameOver() && remaining > 0) {
+                System.out.println("The game ended, so the remaining " + remaining
+                        + (remaining == 1 ? " command" : " commands") + " on this line "
+                        + (remaining == 1 ? "was" : "were") + " skipped.");
+                return false;
             }
         }
+        return false;
+    }
+
+    /**
+     * Splits a line on ';' into trimmed, non-empty commands, so "f 1 1;; f 2 3;" works.
+     * A line with no commands at all is returned as-is so the parser reports "Enter a command".
+     */
+    static List<String> splitChain(String line) {
+        List<String> commands = new ArrayList<>();
+        for (String part : line.split(";")) {
+            if (!part.isBlank()) {
+                commands.add(part.strip());
+            }
+        }
+        if (commands.isEmpty()) {
+            commands.add(line);
+        }
+        return commands;
     }
 }
