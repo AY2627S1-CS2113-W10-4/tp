@@ -1,36 +1,42 @@
 @startuml new-hard-sequence-diagram
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceParticipant underline false
 title Successful new hard
-hide footbox
 
-participant "Jaweeper.runLoop" as Loop
-participant Parser
-participant NewGameCommand
-participant "Difficulty.HARD" as Hard
+participant Jaweeper
+participant "<<class>>\nParser" as Parser
+participant Difficulty
 participant "existing Board" as Board
-participant "new Board(16, 30, 99)" as Fresh
 
-Loop -> Parser : parse("new hard", empty feature map, dimensions)
-Parser -> Parser : no feature factory named new
-Parser -> Parser : parseNewCommand matches hard
-Parser -> NewGameCommand : new NewGameCommand(HARD)
-NewGameCommand --> Hard : rows = 16, cols = 30, mines = 99
-Parser --> Loop : command
+Jaweeper -> Parser ++ : parse("new hard", featureCommands, rows, cols)
+Parser -> Parser ++ : apply(["hard"])
+create NewGameCommand
+Parser -> NewGameCommand ++ : new NewGameCommand(session, HARD)
+NewGameCommand --> Parser --
+Parser --> Parser --
+Parser --> Jaweeper -- : command
 
-Loop -> NewGameCommand : execute(session board)
-NewGameCommand -> Board : setGameState(IN_PROGRESS)
-NewGameCommand -> Fresh : new Board(16, 30, 99)
-activate Fresh
-Fresh -> Fresh : place 99 mines and calculate adjacencies
-NewGameCommand -> Board : copyStateFrom(fresh)
-note right of Board
-  Copies rows, cols, totalMines,
-  grid, and isFirstMove.
-  GameSession keeps this Board.
-end note
-NewGameCommand -> Board : print "New hard game started."
-NewGameCommand -> Board : printBoard()
-NewGameCommand --> Loop
-Loop -> NewGameCommand : isExit()
-NewGameCommand --> Loop : false
-Loop -> Loop : prompt for the next command
+Jaweeper -> NewGameCommand ++ : execute(board)
+NewGameCommand -> Difficulty ++ : rows, cols, mines
+Difficulty --> NewGameCommand -- : 16, 30, 99
+NewGameCommand -> Board ++ : setGameState(IN_PROGRESS)
+Board --> NewGameCommand --
+create "new Board" as Fresh
+NewGameCommand -> Fresh ++ : new Board(16, 30, 99)
+Fresh -> Fresh ++ : placeMines()
+Fresh --> Fresh --
+Fresh -> Fresh ++ : calculateAdjacencies()
+Fresh --> Fresh --
+Fresh --> NewGameCommand --
+NewGameCommand -> Board ++ : copyStateFrom(fresh)
+Board --> NewGameCommand --
+NewGameCommand -> Board ++ : printBoard()
+Board --> NewGameCommand --
+NewGameCommand --> Jaweeper --
+
+Jaweeper -> NewGameCommand ++ : isExit()
+NewGameCommand --> Jaweeper -- : false
 @enduml
