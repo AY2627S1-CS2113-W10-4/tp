@@ -115,7 +115,7 @@ The implementation separates input coordination, command construction, shared st
 
 ![Class diagram showing the shared session, profile registry and storage dependencies](images/zack-profile-classes.svg)
 
-*Figure 1. Selected members and relationships of the profile component. Solid directed associations denote retained references; dashed dependencies denote use. ProfileStartup and Storage expose static operations. Multiplicities show one manager and one current board per session, and zero or more profiles in the registry. This is a focused diagram, not the complete application class model.*
+*Figure 1. Selected members and relationships of the profile component. This is a focused diagram, not the complete application class model.*
 
 A `Profile` has an immutable ID and display name, but its `Stats` object is mutable; the whole object is therefore not immutable. The diagram shows selected identity members and omits statistics, timer and settings details.
 
@@ -151,6 +151,7 @@ Unknown commands and invalid arguments produce `IllegalArgumentException` messag
 
 ![Sequence diagram for parsing and executing the existing flag command](images/zack-command-sequence.svg)
 
+*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters and the internals of flagging are omitted.*
 *Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters, the loop's game-over checks and the internals of flagging are omitted to keep the diagram focused. The call to parse represents the invocation through the loop's parsing function. Dashed arrows are returns; the command instance begins at its creation message.*
 
 The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A true result ends the loop. Otherwise, it proceeds to the next segment or input line, except that a transition to a finished game skips the remaining segments on that line. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
@@ -198,9 +199,11 @@ See [the integration contract](ProfileIntegration.md) for the factory interface 
 
 **Maintainer:** Pranav (ProNoob116).
 
-A game is no longer fixed at 9×9 with 10 mines. `Board` stores `rows`, `cols` and `totalMines`, and mine placement, adjacency counts, flood fill, victory checking and printing all use those values. The public `Board.SIZE` and `Board.MINES` constants remain only so existing tests can still describe the easy board. New code should use `getRows()`, `getCols()` and `getTotalMines()`.
+`Board` stores `rows`, `cols` and `totalMines`. Mine placement, adjacency counts, flood fill, victory checking and printing all use those values. `Board.SIZE` and `Board.MINES` remain only so older tests can describe the easy board. New code should use `getRows()`, `getCols()` and `getTotalMines()`.
 
-`Difficulty` holds the three presets:
+#### Creating a board
+
+`Difficulty` holds the three presets. The no-argument `Board` constructor uses `Difficulty.EASY`.
 
 | Preset | Command | Rows | Columns | Mines |
 |---|---|---|---|---|
@@ -208,140 +211,46 @@ A game is no longer fixed at 9×9 with 10 mines. `Board` stores `rows`, `cols` a
 | `MEDIUM` | `new medium` | 16 | 16 | 40 |
 | `HARD` | `new hard` | 16 | 30 | 99 |
 
-The no-argument `Board` constructor delegates to `Difficulty.EASY`. `new` with no difficulty word does the same.
+`Jaweeper.createFeatureCommands` registers `new`. That factory builds a `NewGameCommand` for a preset. `Parser.parseNewCommand` does the same when no `new` factory is present, which is how the older parser tests still start a game.
 
-#### Class structure
+`NewGameCommand` stores one `Difficulty`. On `execute` it builds a sized `Board` and copies that grid into the board the session already holds. `GameSession` keeps the same `Board` reference. The next command sees the new size through `getRowCount()` and `getColumnCount()`.
 
-`Parser` recognises the difficulty word and constructs a `NewGameCommand`. That command stores one `Difficulty` and, on execution, builds a sized `Board`, then copies the new grid into the board object the session already holds. `GameSession` therefore keeps the same `Board` reference. The next command sees the new dimensions through `getRowCount()` and `getColumnCount()`, which read `grid.length` and `grid[0].length`.
+![Classes involved in creating a board](images/new-hard-class-diagram.png)
 
-```plantuml
-@startuml new-hard-class-diagram
-skinparam classAttributeIconSize 0
-skinparam shadowing false
-title New hard command
+*Figure 3. Classes involved in `new hard`. Source: [diagrams/new-hard-class-diagram.puml](diagrams/new-hard-class-diagram.puml). `GameSession` keeps one `Board`; `new hard` changes that object instead of replacing the session's reference.*
 
-enum Difficulty {
-    EASY
-    MEDIUM
-    HARD
-    + rows : int
-    + cols : int
-    + mines : int
-}
+`new hard` uses the current dimensions only to validate later `r`, `f` and `u` commands. They do not choose the size of the new game.
 
-abstract class Command {
-    + {abstract} execute(board : Board)
-    + isExit() : boolean
-}
+1. `Parser.parse` finds the `new` factory and calls `apply` with `["hard"]`.
+2. The factory selects `Difficulty.HARD` and returns `new NewGameCommand(session, Difficulty.HARD)`. Any other single word throws `IllegalArgumentException` with `Usage: new [easy|medium|hard]`. The loop prints that message and leaves the board unchanged.
+3. `execute` sets `GameState.IN_PROGRESS` and constructs `new Board(16, 30, 99)`. That constructor places 99 mines and calculates adjacencies. The first reveal is still protected by safe-first-click.
+4. `copyStateFrom` copies `rows`, `cols`, `totalMines`, `grid` and `isFirstMove`. It does not call `GameSession.replaceBoard`.
+5. The command starts the session timer when a session is present, prints `New hard game started.`, and prints the board. The header reports `Remaining Mines: 99`. `isExit()` is false, so the loop prompts again.
 
-class NewGameCommand {
-    - difficulty : Difficulty
-    + NewGameCommand()
-    + NewGameCommand(difficulty : Difficulty)
-    + execute(board : Board)
-}
+![Sequence for creating a hard board](images/new-hard-sequence-diagram.png)
 
-class Parser {
-    + {static} parse(input, coordinateCommands, featureCommands, rows, columns) : Command
-    - {static} parseNewCommand(words : String[]) : Command
-}
+*Figure 4. Successful `new hard`. Source: [diagrams/new-hard-sequence-diagram.puml](diagrams/new-hard-sequence-diagram.puml). Scanner reads, logging and the mine-placement loops are omitted.*
 
-class Board {
-    - rows : int
-    - cols : int
-    - totalMines : int
-    + grid : Cell[][]
-    - gameState : GameState
-    - isFirstMove : boolean
-    + Board()
-    + Board(rows : int, cols : int, totalMines : int)
-    + copyStateFrom(freshBoard : Board)
-    + getRows() : int
-    + getCols() : int
-    + getTotalMines() : int
-    + printBoard()
-    + setGameState(gameState : GameState)
-}
+`new easy` and a bare `new` print `New easy game started.` `new medium` prints `New medium game started.`
 
-class GameSession {
-    - board : Board
-    + getBoard() : Board
-}
+#### Custom boards
 
-class Cell
-enum GameState {
-    IN_PROGRESS
-    WON
-    LOST
-}
+`new custom ROWS COLS MINES` is handled by the same `new` factory, before the preset check. `CustomGameCommand` accepts the command only when:
 
-NewGameCommand -up-|> Command
-NewGameCommand --> "1" Difficulty
-NewGameCommand ..> Board : creates and copyStateFrom
-Parser ..> NewGameCommand : creates
-Parser ..> Difficulty
-Board --> "rows * cols" Cell
-Board --> GameState
-Board ..> Difficulty : no-arg constructor uses EASY
-GameSession --> "1" Board : same instance mutated by new hard
-@enduml
-```
+- both dimensions are integers from 5 to 50,
+- the mine count is an integer of at least 1 and strictly less than the number of cells.
 
-*Figure 3. Classes involved in `new hard`. The source file is [diagrams/new-hard-class-diagram.puml](diagrams/new-hard-class-diagram.puml). Solid arrows are retained associations. Dashed arrows are use. `GameSession` keeps one `Board`; `new hard` changes that object instead of replacing the session's reference.*
+A valid command clears the undo history, builds that board, and prints `New custom game started (RxC, M mines).`
 
-#### Processing `new hard`
+#### Executing undo
 
-`new hard` is a built-in command, not a feature-factory command. The loop still passes the current dimensions into `Parser.parse`, but those dimensions are used only for `r`, `f` and `u`. They do not choose the size of the new game.
+`GameSession` keeps a `Stack<Board>`. Before a reveal, flag or unflag changes the board, the command pushes `Board.deepCopy()`. `undo` pops that copy and `copyStateFrom` writes it onto the live board, so the session still holds the same `Board` object. The timer is left running. An empty stack prints `Nothing to undo.`
 
-1. The feature map is checked first. There is no factory named `new`, so parsing continues to the built-in switch. A teammate who later registers `new` takes over `new hard` as well and must handle the difficulty word in that factory.
-2. `parseNewCommand` accepts either one token (`new`) or two tokens. The second token is lowercased with `Locale.ROOT`. `hard` selects `Difficulty.HARD` and returns `new NewGameCommand(Difficulty.HARD)`. Any other word, or a third token, throws `IllegalArgumentException` with `Usage: new [easy|medium|hard]`. The loop prints that message and does not change the board.
-3. `execute` sets the existing board's state to `GameState.IN_PROGRESS`, then constructs `new Board(16, 30, 99)`. That constructor allocates the grid, places 99 mines and calculates adjacencies. The first reveal on this board is still protected by the existing safe-first-click behaviour.
-4. `copyStateFrom` copies `rows`, `cols`, `totalMines`, `grid` and `isFirstMove` into the session's board. It does not call `GameSession.replaceBoard`.
-5. The command prints `New hard game started.` and `printBoard()`. The header reports `Remaining Mines: 99`, and the grid is labelled through row 16 and column 30.
-6. `isExit()` is false, so the loop prompts again. Later coordinate commands are checked against the new grid size.
+The snapshot below is an easy game after two flags and one `undo`. The second flag is gone. The stack still holds the board from before the first flag, and the timer shows 45 seconds already spent.
 
-```plantuml
-@startuml new-hard-sequence-diagram
-title Successful new hard
-hide footbox
+![Objects after an undo](images/UndoObjectDiagram.png)
 
-participant "Jaweeper.runLoop" as Loop
-participant Parser
-participant NewGameCommand
-participant "Difficulty.HARD" as Hard
-participant "existing Board" as Board
-participant "new Board(16, 30, 99)" as Fresh
-
-Loop -> Parser : parse("new hard", empty feature map, dimensions)
-Parser -> Parser : no feature factory named new
-Parser -> Parser : parseNewCommand matches hard
-Parser -> NewGameCommand : new NewGameCommand(HARD)
-NewGameCommand --> Hard : rows = 16, cols = 30, mines = 99
-Parser --> Loop : command
-
-Loop -> NewGameCommand : execute(session board)
-NewGameCommand -> Board : setGameState(IN_PROGRESS)
-NewGameCommand -> Fresh : new Board(16, 30, 99)
-activate Fresh
-Fresh -> Fresh : place 99 mines and calculate adjacencies
-NewGameCommand -> Board : copyStateFrom(fresh)
-note right of Board
-  Copies rows, cols, totalMines,
-  grid, and isFirstMove.
-  GameSession keeps this Board.
-end note
-NewGameCommand -> Board : print "New hard game started."
-NewGameCommand -> Board : printBoard()
-NewGameCommand --> Loop
-Loop -> NewGameCommand : isExit()
-NewGameCommand --> Loop : false
-Loop -> Loop : prompt for the next command
-@enduml
-```
-
-*Figure 4. Successful processing of `new hard`. The source file is [diagrams/new-hard-sequence-diagram.puml](diagrams/new-hard-sequence-diagram.puml). Scanner reads, logging and the mine-placement loops are omitted. Dashed arrows are returns.*
-
-`new easy` and a bare `new` follow the same path with `Difficulty.EASY` and the message `New easy game started.` `new medium` uses `Difficulty.MEDIUM` and prints `New medium game started.`
+*Figure 7. Memory after `undo` removed the second flag. Source: [diagrams/UndoObjectDiagram.puml](diagrams/UndoObjectDiagram.puml).*
 
 #### Hint command
 
