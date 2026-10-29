@@ -1,0 +1,52 @@
+@startuml zack-profile-classes
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceParticipant underline false
+hide circle
+title Profile and session structure (selected members)
+
+class GameSession {
+    --
+    + getBoard() : Board
+    + getActiveProfile() : Profile
+    + getProfileDirectory() : Path
+    + replaceBoard(replacement : Board) : void
+}
+class Board {
+    - rows : int
+    - cols : int
+    - totalMines : int
+    --
+    + getRows() : int
+    + getCols() : int
+}
+class ProfileManager {
+    - activeProfileId : String
+    - profilesFile : Path
+    --
+    + createProfile(name : String) : Profile
+    + selectProfile(id : String) : Profile
+    + getActiveProfile() : Optional<Profile>
+    + renameProfile(id : String, name : String) : Profile
+    + deleteProfile(id : String) : void
+}
+class Profile {
+    - id : String
+    - name : String
+    --
+    + getId() : String
+    + getName() : String
+}
+class Storage {
+    --
+    + {static} readLines(file : Path) : List<String>
+    + {static} writeLines(file : Path, lines : List<String>) : void
+}
+
+GameSession -right-> "board\n1" Board
+GameSession -down-> "profileManager\n1" ProfileManager
+ProfileManager -right-> "profiles\n*" Profile
+ProfileManager ..> Storage
+@enduml

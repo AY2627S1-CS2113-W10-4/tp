@@ -1,0 +1,38 @@
+@startuml zack-command-sequence
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceParticipant underline false
+hide footbox
+title Parsing and executing f 2 3
+
+participant "<<class>>\nJaweeper" as App
+participant "<<class>>\nParser" as Parser
+participant "session : GameSession" as Session
+
+activate App
+App -> Parser ++ : parse("f 2 3", ...)
+note right of Parser
+  Validate input, then convert
+  (2, 3) to zero-based (1, 2).
+  The registered factory constructs
+  the command; its lambda is omitted.
+end note
+create participant "command : FlagCommand" as Flag
+Parser -> Flag ++ : FlagCommand(session, 1, 2)
+Flag --> Parser --
+Parser --> App -- : command
+App -> Session ++ : getBoard()
+Session --> App -- : board
+App -> Flag ++ : execute(board)
+note right of Flag
+  History recording, validation,
+  flag mutation and board output
+  are internal to execute and omitted.
+end note
+Flag --> App --
+App -> Flag ++ : isExit()
+Flag --> App -- : false
+deactivate App
+@enduml

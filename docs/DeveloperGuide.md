@@ -92,108 +92,149 @@ Do not use a player's real saves for corruption or deletion tests.
 
 ### Command processing and profile sessions
 
-**Maintainer:** Zack (zackyesten).
-**Implementation scope:** the profile/session foundation introduced in [PR #34](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/34), with the subsequently integrated command routes described below.
+The input loop, parser and session connect feature commands to the current board and player.
+Startup supports profile creation and selection. In-game `profile create/select/rename/delete`
+commands are not registered in the current implementation.
 
-This section explains how Jaweeper selects a local player, turns text input into commands, and gives commands access to the same current board and profile. Save/load, statistics, difficulty presets and settings now use this integration. Their domain logic is described in the corresponding feature sections. In-game `profile create/select/rename/delete` commands are not yet registered.
+#### Command coordination
 
-#### Architecture and responsibilities
+![Selected classes coordinating a command](images/zack-command-overview.png)
 
-The implementation separates input coordination, command construction, shared state and file access. These are logical responsibilities within the same Java package, not separate processes or independently deployed components.
+*Command coordination.* The diagram focuses on the input loop, parsing and shared session.
+`FlagCommand` represents a registered concrete command; its internal game logic belongs
+to the flagging feature. Factories and other concrete commands are omitted.
+[PlantUML source](diagrams/zack-command-overview.puml).
 
-| Responsibility | Main classes | Boundary |
-|---|---|---|
-| Application startup and execution | `Jaweeper`, `ProfileStartup` | Own the input loop and startup selection; delegate feature logic to commands. |
-| Input interpretation | `Parser` | Validate syntax and coordinates, then construct a command without executing it. |
-| Shared runtime state | `GameSession` | Hold the current `Board`, one shared `ProfileManager`, a timer and the active profile's cached settings. |
-| Profile management | `ProfileManager`, `Profile` | Maintain stable player identities, the registry and the session-only active selection. |
-| Text persistence | `Storage` | Read/write UTF-8 text; do not interpret saved games or calculate statistics. |
+#### Sharing the current player and board
 
-`Jaweeper.main` creates a `ProfileManager` using the working-directory-relative path `data`. Only after startup selection succeeds does it create the initial board and `GameSession`. The session-aware `run` method then delegates to the common execution loop. The older `run(Scanner, Board, ...)` overload remains available for existing tests and does not perform profile selection.
+![Profile and session class structure](images/zack-profile-classes.png)
 
-#### Profile component structure
+*Profile and session structure.* Selected identity and registry members; timer, settings,
+statistics and board internals are described in the other feature sections.
+[PlantUML source](diagrams/zack-profile-classes.puml).
 
-![Class diagram showing the shared session, profile registry and storage dependencies](images/zack-profile-classes.svg)
+`GameSession` holds one replaceable `Board` and one shared `ProfileManager`.
+The manager keeps profiles in a map keyed by UUID and stores the selected UUID in
+`activeProfileId`. `GameSession.getActiveProfile()` resolves that ID through the manager.
+Commands should retrieve the current board/profile when executing, rather than keep an
+old reference across a load or a profile change.
 
-*Figure 1. Selected members and relationships of the profile component. This is a focused diagram, not the complete application class model.*
+The snapshot below shows two registered profiles just after Zheng Yiting has been selected at
+startup and the initial easy board has been constructed. The UUIDs are illustrative valid
+values. Both profiles remain in the registry; only Zheng Yiting's ID is selected. Collections,
+the timer, statistics and settings are omitted from this identity-focused snapshot.
 
-A `Profile` has an immutable ID and display name, but its `Stats` object is mutable; the whole object is therefore not immutable. The diagram shows selected identity members and omits statistics, timer and settings details.
+![Objects after startup selects Zheng Yiting](images/zack-profile-objects.png)
 
-`ProfileManager.renameProfile` replaces the profile object while preserving its UUID. The active selection stores the ID, so subsequent lookups obtain the renamed profile. Consumers should obtain the current profile when needed rather than cache an old object. The current replacement constructs fresh statistics: preserving statistics is still required before exposing rename as an in-game command.
+*Selected profile snapshot.* [PlantUML source](diagrams/zack-profile-objects.puml).
 
-`GameSession` holds one replaceable board reference. Following `replaceBoard(validatedBoard)`, the next command receives the replacement through `getBoard()`. Replacement itself does not validate saved-game contents, handle unsaved progress or update timers. Those operations remain the responsibility of the calling feature.
+#### Creating or selecting a profile at startup
 
-#### Startup selection and profile persistence
+`Jaweeper.main` opens the registry using `new ProfileManager(Path.of("data"))`, then calls
+`ProfileStartup.selectProfile`. No board exists yet, so startup selection cannot discard
+an ongoing game.
 
-At the startup prompt, `create NAME` creates and explicitly selects a profile; `select NUMBER` selects an entry from the displayed list. The displayed number is a temporary user-facing index, not the persistent identity. `exit` or end-of-input cancels startup before a board is created. Invalid choices are reported and the prompt repeats.
+1. Display the registry in creation order with one-based numbers.
+2. For `create NAME`, call `createProfile`, then explicitly select the returned ID.
+   Creation alone does not change the active player.
+3. For `select NUMBER`, validate the displayed number and select the corresponding ID.
+   The number is a temporary UI index, not the persistent identity.
+4. Invalid input or a failed write reports an error and repeats the prompt. `exit` or EOF
+   cancels startup. On success, construct the board/session and enter the game loop.
 
-`ProfileManager.createProfile` alone does not select its result. Keeping these operations separate lets another caller create a profile without changing the current player. Startup deliberately performs both operations. Active selection is not written to disk, so the next launch prompts again.
+Active selection is not saved, so each launch prompts again. Names are trimmed, contain
+1–30 Unicode letters/digits, spaces, underscores or hyphens, and start with a letter/digit.
+Uniqueness ignores case. Tabs and line breaks are rejected.
 
-The registry is a human-readable UTF-8 file, `data/profiles.txt`. Its first line is `profiles-v1`; each following line contains a canonical UUID, a tab, and a display name. Names are trimmed, must contain 1–30 permitted characters, and must start with a letter or digit. Unicode letters/digits, spaces, underscores and hyphens are allowed; tabs and line breaks are not. Name uniqueness ignores case.
+#### Persisting identity changes
 
-A missing registry means first-time use. An existing empty file, invalid header, malformed record, duplicate ID or duplicate name is instead an error. Startup must not silently replace such a file with an empty registry. Permission and other read errors are also reported, rather than interpreted as "no profiles".
+`data/profiles.txt` is UTF-8 text. Its header is `profiles-v1`; subsequent records contain
+a canonical UUID, a tab and a display name. A missing file means first use. An existing
+empty file, invalid header, malformed record or duplicate identity/name causes an error;
+the manager does not overwrite it with an empty registry.
 
-For a registry change, the manager builds a candidate map, serializes it, and calls `Storage.writeLines` before replacing its in-memory map. Storage creates parent directories and writes a temporary file alongside the target, then attempts an atomic replacement. A non-atomic replacement is used if atomic moves are unsupported. This reduces exposure to partially written files but is not a universal crash-recovery guarantee or a multi-process transaction system.
+For create, rename or delete, `ProfileManager` prepares a candidate map and writes it
+before replacing the live map. `Storage.writeLines` creates parent directories, writes
+a sibling temporary file and attempts atomic replacement, falling back to a non-atomic
+move when unsupported. It does not provide a multi-file transaction or support concurrent
+application instances writing to the same directory.
 
-A player's feature data belongs under `data/profiles/<UUID>/`. Changing a display name does not change this path. The directory accessor does not create it; a subsequent storage write creates parents as needed. The foundation's delete operation rejects the active profile and removes only an inactive profile's registry record. Associated feature files are retained. A future deletion UI must explain that behaviour rather than claim all data was erased.
+Feature data uses `data/profiles/<UUID>/`; a display-name change does not change this path.
+The path accessor does not create the directory. `renameProfile` replaces the `Profile`
+while keeping its ID. The replacement currently has fresh statistics, which must be
+addressed before exposing runtime rename. `deleteProfile` rejects the active profile and
+removes only an inactive registry entry, retaining associated files. These model methods
+are not yet in-game commands.
 
-#### Command parsing and execution
+#### Parsing and executing a command
 
-For each command on an input line (a line may chain several commands, see [Gameplay quality-of-life features](#gameplay-quality-of-life-features)), the session-aware loop reads the current board dimensions and passes them to `Parser.parse`. Command names are lowercased with `Locale.ROOT`; argument case is preserved.
+The session-aware loop parses each semicolon-separated segment immediately before
+executing it, using the current row and column limits. Command names are lowercased
+with `Locale.ROOT`; argument case is preserved. Quoting is not supported.
 
-Dispatch follows this order:
+Dispatch precedence is:
 
-1. If a matching lowercase key exists in the feature registry, invoke its `Function<String[], Command>` factory with the argument tokens, excluding the command name.
-2. Otherwise, handle built-in `help`, `exit`, `new` and `board`. `help`, `exit` and `board` reject extra arguments. `new` accepts an optional difficulty word, described under [Difficulty levels and dynamic boards](#difficulty-levels-and-dynamic-boards). (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
-3. For `r`, `f` and `u`, validate two integer coordinates against separate row/column limits, convert from one-based input to zero-based indices, and invoke the registered coordinate factory.
+1. A registered feature factory receives argument tokens and constructs a command.
+2. Otherwise, built-in `help`, `exit`, `new` and `board` handle their arguments.
+3. For `r`, `f` and `u`, validate two integers, check the current bounds, convert to
+   zero-based coordinates, then invoke the coordinate factory.
 
-Unknown commands and invalid arguments produce `IllegalArgumentException` messages. The loop displays the message and continues. Factories construct commands; they must not mutate gameplay or perform persistence as a parsing side effect.
+Feature registration overrides a built-in of the same name. In production, `new` and
+`exit` use session-aware registrations; legacy test overloads retain their fallback
+behaviour. `clear` is currently disabled. Factories validate/construct only: gameplay
+and file changes belong in `execute`.
 
-![Sequence diagram for parsing and executing the existing flag command](images/zack-command-sequence.svg)
+![Parsing and executing the flag command](images/zack-command-sequence.png)
 
-*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters and the internals of flagging are omitted.*
-*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters, the loop's game-over checks and the internals of flagging are omitted to keep the diagram focused. The call to parse represents the invocation through the loop's parsing function. Dashed arrows are returns; the command instance begins at its creation message.*
+*Successful `f 2 3`.* The board has at least two rows and three columns. The registered
+factory constructs `FlagCommand(session, 1, 2)`; the diagram collapses its lambda into
+the construction message. Scanner access, logging, dimension accessors, command internals
+and game-over checks are omitted. The parse call represents the loop's parsing adapter.
+[PlantUML source](diagrams/zack-command-sequence.puml).
 
-The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A true result ends the loop. Otherwise, it proceeds to the next segment or input line, except that a transition to a finished game skips the remaining segments on that line. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
+After parsing, the loop retrieves the current board, calls `execute(board)` and checks
+`isExit()`. Invalid input/execution arguments are reported without ending the loop.
+It does not roll back changes made before an execution error. See
+[Command chaining](#command-chaining) for continuation and finished-game rules.
 
-Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. `hint` is registered there and does not replace a built-in command.
+To add a profile-aware feature, give its command a `GameSession` constructor parameter
+and register its factory in `Jaweeper.createFeatureCommands(session)`. Reuse that session;
+do not create a second manager. The command still implements `execute(Board)`. Save/load
+validation, unsaved-progress confirmation and timer updates belong to the calling feature,
+not `replaceBoard` itself. See [the integration contract](ProfileIntegration.md).
 
-Feature registrations take precedence over built-ins. For example, the registered `new` factory handles both `new easy` and plain `new`, and supplies the session to `NewGameCommand`. The registered `exit` supplies the shared save tracker, while the fallback exit constructor remains immediate for legacy callers. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
+#### Error boundaries and verification
 
-#### Defensive checks and error boundaries
+Ordinary conditions/exceptions reject user input even when assertions are disabled.
+Assertions check internal assumptions such as validated coordinate bounds and non-null
+factory results. `ProfileManager.getActiveProfile()` returns an `Optional`;
+`GameSession.getActiveProfile()` throws if selection was omitted. Null boards are rejected
+at session construction/replacement.
 
-User input is checked with ordinary conditionals and exceptions, not assertions. For example, invalid coordinate text is rejected even when Java assertions are disabled. Assertions instead document internal invariants, including validated coordinate bounds and non-null results from command factories. Gradle's test and run tasks enable assertions; a direct JAR launch can use `java -ea -jar jaweeper.jar`.
+Session start/end is logged at INFO; dispatch and rejected input at FINE. These dispatch
+messages do not include the full user input. File commands handle their own `IOException`
+because `execute(Board)` does not declare it, and must not print success after a failed write.
+EOF exits directly rather than invoking `ExitCommand`; see
+[Save/load limitations](#testing-and-known-limitations) for the resulting warning gap.
 
-Session/profile preconditions also have distinct meanings: `ProfileManager.getActiveProfile()` returns an `Optional`, while `GameSession.getActiveProfile()` throws `IllegalStateException` if startup selection was omitted. Session construction and board replacement reject null references.
+| Test class | Behaviour covered |
+|---|---|
+| `CoreCommandsTest`, `GameplayRoutingTest` | Command routes and coordinate conversion. |
+| `ParserAssertionsTest` | Enabled assertions, null factory results and invalid input. |
+| `ProfileStorageTest` | Temporary-directory persistence, duplicate names, invalid registries, retained files and failed writes. |
+| `ProfileRuntimeTest` | Startup selection/cancellation, recovery, shared session, overrides, rectangular limits and board replacement. |
 
-The application logs session start/end at INFO and command dispatch/rejected input at FINE. It does not log complete user command lines for these dispatch messages. Startup registry read failures are reported without replacing the registry. Because `execute(Board)` does not declare checked I/O exceptions, file-based commands must handle their own `IOException` and must not report success after a failed write.
+| Decision | Alternative and trade-off |
+|---|---|
+| Stable UUID separate from name | Name-based paths are easier to read but break on rename. |
+| Explicit shared session | Globals hide dependencies; separate managers can disagree about the current player. |
+| Write a candidate registry first | Mutating memory first would leave it ahead of disk after a failed write. |
+| Generic text storage | A single class owning every format couples profiles, saves and statistics. |
 
-EOF currently ends the game loop directly; it does not execute an exit command. Consequently, the registered exit command's unsaved-progress check does not protect EOF.
+Remaining profile work is the runtime command workflow, its progress-loss policy and
+preservation of existing statistics on rename. Save/load and statistics commands already
+exist and are described in their own sections below.
 
-#### Design decisions and alternatives
-
-| Decision | Alternative considered | Reason and trade-off |
-|---|---|---|
-| Stable UUID identity, separate from display name | Use the name as a filename/key | Renames do not break save/statistics references; IDs are less convenient for users, so startup displays numbered names. |
-| Pass one GameSession to feature commands | Static global state or a new manager per command | Explicit sharing is easier to isolate in tests and avoids independent active selections; constructors need an extra dependency. |
-| Preserve execute(Board) and add feature factories | Rewrite every command to accept a new context | Existing commands/tests remain compatible; profile-aware commands carry session state in addition to receiving the board. |
-| Save a candidate registry before replacing the in-memory map | Mutate the map and then write | A failed write does not make memory claim that a registry update succeeded; replacement requires a temporary copy. |
-| Generic text storage | One storage class owning profiles, boards and statistics | Each owner controls their format without expanding one shared class; each feature must supply its own validation and error policy. |
-
-#### Verification and remaining work
-
-The automated tests separate parser behaviour, startup interaction and file-system state:
-
-- `CoreCommandsTest` and `GameplayRoutingTest` cover the existing command routes and zero-based coordinate conversion.
-- `ParserAssertionsTest` checks enabled assertions, a null command-factory result, and invalid-input exceptions.
-- `ProfileStorageTest` uses JUnit temporary directories to exercise persistence, duplicate names, malformed registries, retained feature files and failed-write behaviour.
-- `ProfileRuntimeTest` covers startup creation/selection, cancellation, recovery from invalid input, shared session access, feature overrides, rectangular coordinate limits and board replacement.
-
-Run `./gradlew clean build` (Windows: `.\gradlew.bat clean build`) before submitting changes. The rectangular routing test checks the parser/session adapter; it is not evidence that all Board algorithms already support rectangular games.
-
-This foundation does not yet supply in-game profile create/select/rename/delete commands, deletion confirmations, unsaved-game protection, saved-game restoration or statistics updates. Difficulty presets and `hint` are described in the next section. The session loop reads the current board's row and column counts through `GameSession`. Legacy `Parser.parse` overloads validate coordinates against the easy preset. Later features must update the relevant integration points and their documentation when behaviour changes.
-
-See [the integration contract](ProfileIntegration.md) for the factory interface and ownership boundaries. Other team members should add their own implementation sections alongside this one.
 
 ### Difficulty levels and dynamic boards
 
@@ -631,3 +672,8 @@ In-game profile commands and persistent statistics need additional tests when th
 - Java style checks: [Checkstyle](https://checkstyle.org/).
 
 Feature owners should add specific attribution here for any other reused or adapted code, diagrams or documentation.
+
+- Profile/command diagram rendering: [PlantUML](https://plantuml.com/).
+- The [T11-3 Developer Guide](https://ay2627s1-cs2113-t11-3.github.io/tp/DeveloperGuide.html)
+  was consulted as a reference for documentation presentation; the profile/command
+  explanations and diagrams describe Jaweeper's own implementation.
