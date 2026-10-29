@@ -232,3 +232,170 @@ A hint can point at a mine if a flag is on the wrong cell. Correct the flags and
 | `profile select NUMBER` | Select a player after saving unfinished progress. |
 | `profile rename NUMBER NAME` | Rename a profile without changing its identity. |
 | `profile delete NUMBER [confirm]` | Warn first; add `confirm` to remove an inactive profile. |
+
+<!-- yongxiang22 (Yong Xiang): add "Revealing a cell" before the flagging section,
+     and the save/load sections after "Leaving the application" in UserGuide.md. -->
+
+### Revealing a cell: `r`
+
+Opens a cell. A safe cell shows how many of its 8 neighbours hold mines, and a blank cell also opens the blank area around it. Revealing a mine ends the game. You win when every safe cell is revealed.
+
+Format: `r ROW COL`
+
+* `ROW` and `COL` start at 1. `ROW` is counted from the top and `COL` from the left.
+* A flagged cell cannot be revealed. Jaweeper prints `Cell is flagged! Unflag it first.`; remove the flag with `u ROW COL`.
+
+Example:
+
+`r 3 3`
+
+Expected output when the cell is safe (your numbers will differ):
+
+```text
+> r 3 3
+Remaining Mines: 1
+      1   2   3   4   5
+    +---+---+---+---+---+
+  1 | F |   |   | 1 | . |
+    +---+---+---+---+---+
+  2 |   |   |   | 1 | 1 |
+```
+
+Expected output when the last safe cell is revealed:
+
+```text
+========================
+        VICTORY!        
+========================
+```
+
+Expected output when the cell is a mine:
+
+```text
+> r 3 3
+BOOM! You hit a mine at (3, 3).
+...
+========================
+       GAME OVER        
+========================
+```
+
+Once the game is over, `r`, `f`, `u` and `hint` print `The game is over. Type 'new' to start a new game.`
+
+> **Tip:** Your first reveal of each game never hits a mine, unless you have turned this off with `settings safeclick off`.
+
+### Saving a game: `save`
+
+Saves your unfinished game so you can continue it later, including the time already spent. Each profile has its own saves.
+
+Format: `save NAME` or `save`
+
+* `NAME` has 1–30 letters, digits, `_` or `-`, with no spaces. It is not case-sensitive: `Trip` and `trip` are the same save.
+* `save` on its own re-saves to the name this game was last saved to or loaded from.
+* Saving to an existing name replaces that save.
+
+Example:
+
+`save trip`
+
+Expected output:
+
+```text
+> save trip
+Game saved as 'trip'.
+
+> save
+Overwrote save 'trip'.
+```
+
+These inputs are rejected and nothing is saved:
+
+```text
+> save
+This game has not been saved yet. Usage: save NAME (letters, digits, '_' or '-'), or save to re-save this game.
+
+> save ../x
+Save names use 1-30 letters, digits, '_' or '-' (no spaces).
+
+> save con
+'con' is reserved by the system; choose another name.
+```
+
+A finished game cannot be saved, because there is nothing left to continue.
+
+### Loading a game: `load`
+
+Replaces the current game with a saved one and continues its timer.
+
+Format: `load NAME`
+
+Example:
+
+`load trip`
+
+Expected output:
+
+```text
+> load trip
+Loaded save 'trip'.
+Remaining Mines: 9
+```
+
+The saved board is then printed. If your current game has moves you have not saved, Jaweeper warns you first. Type the same `load` again to load anyway:
+
+```text
+> load trip
+Your current game has unsaved progress that will be lost.
+Use 'save NAME' to keep it first, or type 'load trip' again to load anyway.
+> load trip
+Loaded save 'trip'.
+```
+
+If the save cannot be loaded, your current game is not changed:
+
+```text
+> load nothing
+Could not load 'nothing': No save named 'nothing'.
+Your current game has not been changed.
+```
+
+### Where saves are kept
+
+Saves are text files in `data/profiles/<profile ID>/saves/`, inside the folder you launched Jaweeper from. Each file ends with a checksum. If a save is edited by hand or damaged, Jaweeper refuses to load it:
+
+```text
+> load edited
+Could not load 'edited': The save file was changed outside Jaweeper or is damaged (checksum mismatch).
+Your current game has not been changed.
+```
+
+> **Caution:** Do not edit save files. Copy the whole `data` folder if you want to back up your saves.
+
+### Unsaved progress when exiting
+
+If your game has moves you have not saved, `exit` warns you instead of quitting. Type `exit` again to quit without saving:
+
+```text
+> exit
+You have unsaved progress in this game.
+Use 'save NAME' to keep it, or type 'exit' again to quit without saving.
+> exit
+Goodbye!
+```
+
+<!-- FAQ entries to add -->
+
+**Q**: How do I move my saved games to another computer?
+
+**A**: Copy the whole `data` folder to the folder you launch Jaweeper from on the other computer. Then select the same profile.
+
+**Q**: Why does `load` say my save was changed outside Jaweeper?
+
+**A**: The file no longer matches its checksum, usually because it was edited or damaged. Jaweeper does not load it, to protect your current game.
+
+<!-- Command Summary rows to add -->
+
+| `r ROW COL` | Reveals a cell. |
+| `save NAME` / `save` | Saves this game / re-saves it to the same name. |
+| `load NAME` | Continues a saved game; repeat it to confirm when warned. |
+
