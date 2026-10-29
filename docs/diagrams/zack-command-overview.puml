@@ -1,0 +1,47 @@
+@startuml zack-command-overview
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceParticipant underline false
+hide circle
+title Command coordination (selected classes)
+
+class Jaweeper {
+    --
+    + {static} main(args : String[]) : void
+    + {static} run(...) : void
+}
+class Parser {
+    --
+    + {static} parse(...) : Command
+}
+abstract class Command {
+    --
+    + {abstract} execute(board : Board) : void
+    + isExit() : boolean
+}
+class FlagCommand {
+    - row : int
+    - col : int
+    --
+    + execute(board : Board) : void
+}
+class GameSession {
+    --
+    + getBoard() : Board
+    + getActiveProfile() : Profile
+}
+class Board {
+    --
+    + printBoard() : void
+}
+Jaweeper ..> Parser
+Jaweeper ..> Command
+Jaweeper ..> GameSession
+Parser ..> Command
+FlagCommand -up-|> Command
+FlagCommand --> "session\n0..1" GameSession
+Command ..> Board
+GameSession --> "board\n1" Board
+@enduml
