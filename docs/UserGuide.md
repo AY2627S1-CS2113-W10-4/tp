@@ -284,6 +284,64 @@ Once the game is over, `r`, `f`, `u` and `hint` print `The game is over. Type 'n
 
 > **Tip:** Your first reveal of each game never hits a mine, unless you have turned this off with `settings safeclick off`.
 
+### Flagging a cell: `f`
+
+Marks a hidden cell where you think a mine is. A flagged cell cannot be revealed by mistake. `Remaining Mines` goes down by 1 for each flag.
+
+Format: `f ROW COL`
+
+Example:
+
+`f 1 1`
+
+Expected output:
+
+```text
+> f 1 1
+Cell (1, 1) flagged.
+Remaining Mines: 9
+      1   2   3   4   5   6   7   8   9
+    +---+---+---+---+---+---+---+---+---+
+  1 | F | . | . | . | . | . | . | . | . |
+```
+
+A flag is only your guess. Jaweeper does not tell you whether it is correct until the game ends.
+
+These inputs are rejected and the board is not changed:
+
+```text
+> f 1 1
+Cell (1, 1) is already flagged.
+
+> f 0 1
+Coordinates must be from 1 to 9.
+
+> f 1
+Usage: f ROW COL (rows 1-9, columns 1-9).
+```
+
+Flagging a revealed cell prints `Cell (ROW, COL) is already revealed.`
+
+### Removing a flag: `u`
+
+Removes a flag you placed.
+
+Format: `u ROW COL`
+
+Example:
+
+`u 1 1`
+
+Expected output:
+
+```text
+> u 1 1
+Cell (1, 1) unflagged.
+Remaining Mines: 10
+```
+
+If the cell has no flag, Jaweeper prints `Cell (ROW, COL) is not flagged.`
+
 ### Saving a game: `save`
 
 Saves your unfinished game so you can continue it later, including the time already spent. Each profile has its own saves.
@@ -452,10 +510,167 @@ Rank | Profile         | Wins   | Losses | Win Rate
 > leaderboard x
 Usage: leaderboard
 ```
+
+### Seeing the mines after a loss
+
+When you hit a mine, the board shows where every mine was and which flags were wrong:
+
+```text
+> r 3 3
+BOOM! You hit a mine at (3, 3).
+Remaining Mines: 1
+      1   2   3   4   5
+    +---+---+---+---+---+
+  1 | X | . | . | . | * |
+    +---+---+---+---+---+
+  2 | . | . | . | . | . |
+    +---+---+---+---+---+
+  3 | . | . | * | . | . |
+    +---+---+---+---+---+
+  4 | . | . | . | . | . |
+    +---+---+---+---+---+
+  5 | F | . | . | . | . |
+    +---+---+---+---+---+
+========================
+       GAME OVER        
+========================
+```
+
+| Symbol | Meaning |
+|---|---|
+| `*` | A mine you did not flag |
+| `X` | A flag on a cell that was safe |
+| `F` | A flag on a mine (correct) |
+
+`board` keeps showing this view until you start a new game.
+
+### Changing settings: `settings`
+
+Shows or changes the settings of the current profile. Settings are saved, so they stay the same the next time you choose this profile.
+
+Format: `settings` or `settings safeclick on|off`
+
+* `safeclick on` (default): the first reveal of each game is never a mine and always opens an area.
+* `safeclick off`: the first reveal can hit a mine.
+
+Example:
+
+`settings safeclick off`
+
+Expected output:
+
+```text
+> settings safeclick off
+Safeclick is now OFF. It takes effect on the next first reveal.
+
+> settings
+Settings for Tester:
+  safeclick  OFF  (your first reveal is never a mine)
+Change with: settings safeclick on|off
+```
+
+The change applies to the next first reveal; a game you have already started is not affected. Any other input is rejected:
+
+```text
+> settings safeclick maybe
+Usage: settings, or settings safeclick on|off
+```
+
+### Running several commands at once: `;`
+
+Separate commands with `;` to run them one after another from a single line.
+
+Format: `COMMAND; COMMAND; ...`
+
+Example:
+
+`f 1 1; f 1 2; u 1 1`
+
+Expected output:
+
+```text
+> f 1 1; f 1 2; u 1 1
+Cell (1, 1) flagged.
+...
+Cell (1, 2) flagged.
+...
+Cell (1, 1) unflagged.
+Remaining Mines: 9
+```
+
+The board is printed after each line marked `...`.
+
+* If one command fails, its error is shown and the rest still run. For example, `unknown; board` prints `Unknown command: unknown. Type help for usage.` and then the board.
+* Each command uses the board as the earlier commands left it, so `new hard; f 16 30` works.
+* If a command wins or loses the game, the rest of the line is skipped:
+
+```text
+========================
+        VICTORY!        
+========================
+The game ended, so the remaining 2 commands on this line were skipped.
+```
+
+### Listing saved games: `saves`
+
+Lists the current profile's saved games in alphabetical order.
+
+Format: `saves`
+
+Expected output:
+
+```text
+> saves
+Saved games (1):
+  trip
+Use 'load NAME' to continue one, or 'delete NAME' to remove it.
+```
+
+If there are none: `No saved games yet. Use 'save NAME' to create one.`
+
+### Deleting a saved game: `delete`
+
+Permanently deletes a saved game. Type the same command twice to confirm.
+
+Format: `delete NAME`
+
+Example:
+
+`delete trip`
+
+Expected output:
+
+```text
+> delete trip
+This will permanently delete save 'trip'.
+Type 'delete trip' again to confirm.
+> delete trip
+Deleted save 'trip'.
+```
+
+If the save you deleted belonged to the game you are playing, Jaweeper adds `That was the save for your current game, which now counts as unsaved.` If no save has that name, it prints `No save named 'trip'. Type 'saves' to see your saved games.`
+
 <!-- FAQ entries to add -->
-Q: Do my statistics change when I rename my profile?
-A: No. Renaming keeps your statistics. They are only reset by `stats clear` or by exiting Jaweeper.
+**Q**: Do my statistics change when I rename my profile?
+
+**A**: No. Renaming keeps your statistics. They are only reset by `stats clear` or by exiting Jaweeper.
+
+**Q**: I flagged the wrong cell. What do I do?
+
+**A**: Remove the flag with `u ROW COL`, or use `undo` if it was your last move.
+
+**Q**: Can I put `;` inside a save name?
+
+**A**: No. `;` always separates commands, and save names only allow letters, digits, `_` and `-`.
 <!-- Command Summary rows to add -->
 | `stats` | Shows your statistics. |
 | `stats clear` | Resets your statistics. |
 | `leaderboard` | Compares all profiles. |
+| `f ROW COL` | Flags a cell. |
+| `u ROW COL` | Removes a flag. |
+| `settings` | Shows your settings. |
+| `settings safeclick on\|off` | Makes your first reveal safe, or not. |
+| `COMMAND; COMMAND` | Runs several commands from one line. |
+| `saves` | Lists your saved games. |
+| `delete NAME` | Deletes a saved game; type it twice to confirm. |
+
