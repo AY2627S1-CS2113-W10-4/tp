@@ -29,8 +29,51 @@ working directory. Always launch from the same folder to find the same profiles.
 If the registry cannot be read, the application reports the problem without replacing
 it. Preserve the existing files before attempting recovery.
 
-In-game `profile create/select/rename/delete` commands are not available in this version. For now,
-save and exit, then relaunch to create or select another player.
+### Managing profiles during a game
+
+At the game prompt `>`, use these commands:
+
+| Command | Example | Result |
+|---|---|---|
+| `profile list` | `profile list` | Lists profiles in creation order; `*` marks the current player. |
+| `profile create NAME` | `profile create Guest` | Creates a profile without switching away from your current game. |
+| `profile select NUMBER` | `profile select 2` | Switches to that player and starts a fresh easy game. |
+| `profile rename NUMBER NAME` | `profile rename 2 Guest New` | Changes the name while keeping the player's identity, saves, settings and current statistics. |
+| `profile delete NUMBER` | `profile delete 2` | Shows a warning; nothing is deleted yet. |
+| `profile delete NUMBER confirm` | `profile delete 2 confirm` | Removes that inactive profile from the list. |
+
+Numbers refer to the current `profile list`, starting at 1. Deleting an entry renumbers
+later entries, so check the list again before selecting, renaming or confirming deletion.
+Names can include spaces without quotes; the same name restrictions as startup apply.
+Command/action words ignore case. Missing arguments, invalid numbers and duplicate names
+are rejected without changing profiles.
+
+Save unfinished progress before switching. If the current board has unsaved revealed
+or flagged cells, `profile select` asks you to use `save NAME` first. Selecting the
+current player does nothing. A successful switch clears the previous game's undo
+history, starts a fresh timer and uses the selected player's settings. Use `load NAME`
+to resume one of that player's saved games; it is not resumed automatically.
+
+Example from a fresh directory after creating Zheng Yiting at startup:
+
+```text
+profile create Guest
+f 1 1
+profile select 2
+save first-game
+profile select 2
+profile rename 2 Guest New
+profile select 1
+load first-game
+```
+
+The first selection is blocked until the game is saved. The second starts a fresh game
+for Guest. The final load restores Zheng Yiting's saved flag at row 1, column 1.
+
+You cannot delete the active profile; select another first. Deletion removes the registry
+entry but retains its data files. Recreating the same name creates a new identity and
+does **not** recover those files. Statistics survive renaming/switching in the current
+run but are not persisted across application restarts.
 
 ### Viewing help and the board
 
@@ -184,3 +227,8 @@ A hint can point at a mine if a flag is on the wrong cell. Correct the flags and
 | `create NAME` / `select NUMBER` | Create/select a profile at the startup prompt. |
 | `help` / `board` | Show command help / the current board. |
 | `exit` | Quit; confirm first when warned about unsaved progress. |
+| `profile list` | Show current profile numbers and the selected player. |
+| `profile create NAME` | Create a profile without switching. |
+| `profile select NUMBER` | Select a player after saving unfinished progress. |
+| `profile rename NUMBER NAME` | Rename a profile without changing its identity. |
+| `profile delete NUMBER [confirm]` | Warn first; add `confirm` to remove an inactive profile. |

@@ -7,6 +7,20 @@ skinparam sequenceParticipant underline false
 hide circle
 title Profile and session structure (selected members)
 
+abstract class Command {
+    --
+    + {abstract} execute(board : Board) : void
+}
+class ProfileCommand {
+    - action : String
+    - number : int
+    - name : String
+    - confirmed : boolean
+    --
+    + {static} parse(...) : ProfileCommand
+    + execute(board : Board) : void
+}
+
 class GameSession {
     --
     + getBoard() : Board
@@ -38,6 +52,7 @@ class Profile {
     --
     + getId() : String
     + getName() : String
+    + withName(replacementName : String) : Profile
 }
 class Storage {
     --
@@ -46,6 +61,8 @@ class Storage {
 }
 
 GameSession -right-> "board\n1" Board
+ProfileCommand -up-|> Command
+ProfileCommand --> "session\n1" GameSession
 GameSession -down-> "profileManager\n1" ProfileManager
 ProfileManager -right-> "profiles\n*" Profile
 ProfileManager ..> Storage
