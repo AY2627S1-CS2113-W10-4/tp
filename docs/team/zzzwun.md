@@ -36,7 +36,7 @@ Given below are my contributions to the project.
     - **Updated `help`**: grouped by purpose, covers every command and chaining, and shows the coordinate range of the current board instead of a fixed 9×9.
     - **`clear` command**: implemented using ANSI escape codes but currently disabled, pending a fix for terminals that ignore these codes.
     - Credits: the `clear` command uses standard ANSI terminal escape sequences.
-- **Code contributed**: [RepoSense link](<iframe src="https://nus-cs2113-ay2627-s1.github.io/tp-dashboard/#/widget/?search=&sort=groupTitle&sortWithin=title&timeframe=commit&mergegroup=&groupSelect=groupByRepos&breakdown=true&checkedFileTypes=docs~functional-code~test-code~other&since=2026-09-18T00%3A00%3A00&filteredFileName=&chartGroupIndex=11&chartIndex=2" frameBorder="0" width="800px" height="147px"></iframe>)
+- **Code contributed**: [RepoSense link](https://nus-cs2113-ay2627-s1.github.io/tp-dashboard/#/widget/?search=&sort=groupTitle&sortWithin=title&timeframe=commit&mergegroup=&groupSelect=groupByRepos&breakdown=true&checkedFileTypes=docs~functional-code~test-code~other&since=2026-09-18T00%3A00%3A00&filteredFileName=&chartGroupIndex=11&chartIndex=2)
 - **Project management**:
     - Tagged and published release `v2.0` on GitHub.
 - **Enhancements to existing features**:
