@@ -6,7 +6,7 @@ For player-facing command instructions, see the [User Guide](UserGuide.md).
 
 The descriptions below distinguish the current implementation from planned work.
 A method available to Java callers is not necessarily exposed as a player command.
-In particular, startup profile creation/selection is available, while in-game profile management is still pending.
+Profiles can be created/selected at startup and managed during play through `profile` commands.
 
 ## Contents
 
@@ -41,7 +41,7 @@ The application does not provide online multiplayer, cloud synchronisation or si
 
 ## User Stories
 
-These stories summarise the implemented scope and remaining profile work.
+These stories summarise the current scope.
 Status describes the current command interface, not merely the presence of a model method.
 
 | As a ... | I want to ... | So that I can ... | Current status |
@@ -54,7 +54,7 @@ Status describes the current command interface, not merely the presence of a mod
 | Player | list and delete named saves | manage my stored games | Available through `saves` and `delete`. |
 | Player | control safe-first-reveal behaviour | choose how the first move behaves | Available through `settings safeclick on\|off`. |
 | Player | view statistics and a leaderboard | inspect recorded results | Commands exist; statistics currently remain in memory. |
-| Player | create, select, rename or delete profiles during play | manage players without relaunching | Planned; no in-game `profile` route yet. |
+| Player | create, select, rename or delete profiles during play | manage players without relaunching | Available through `profile`; save unfinished progress before switching. |
 
 ## Setting up and verification
 
@@ -93,8 +93,8 @@ Do not use a player's real saves for corruption or deletion tests.
 ### Command processing and profile sessions
 
 The input loop, parser and session connect feature commands to the current board and player.
-Startup supports profile creation and selection. In-game `profile create/select/rename/delete`
-commands are not registered in the current implementation.
+Startup supports profile creation and selection. `ProfileCommand` provides in-game
+listing, creation, selection, renaming and deletion through the same manager.
 
 #### Command coordination
 
@@ -161,10 +161,40 @@ application instances writing to the same directory.
 
 Feature data uses `data/profiles/<UUID>/`; a display-name change does not change this path.
 The path accessor does not create the directory. `renameProfile` replaces the `Profile`
-while keeping its ID. The replacement currently has fresh statistics, which must be
-addressed before exposing runtime rename. `deleteProfile` rejects the active profile and
-removes only an inactive registry entry, retaining associated files. These model methods
-are not yet in-game commands.
+while keeping its ID and sharing the original `Stats` object through `Profile.withName`.
+This preserves in-memory results on rename; it does not add statistics persistence.
+`deleteProfile` rejects the active profile and removes only an inactive registry entry,
+retaining associated files.
+
+#### Managing profiles during play
+
+`Jaweeper.createFeatureCommands` registers `profile` using the existing shared session,
+`SaveTracker` and saved-game deletion confirmation. `ProfileCommand.parse` validates
+the action, argument count, positive list number and name, without performing I/O.
+`execute` resolves a number against the current creation-ordered list. This matters for
+chained commands: deleting an earlier profile can change subsequent list numbers.
+
+- `list` marks the active profile. `create NAME` persists a new entry but leaves the
+  current profile, board and timer unchanged; unlike startup creation, it does not select.
+- `select NUMBER` is a no-op for the active ID. For another ID, it first calls
+  `SaveTracker.hasUnsavedChanges`. Unsaved progress blocks the switch with an instruction
+  to save; no discard-confirmation shortcut is offered. This reuses the tracker's rule
+  for unfinished boards with revealed/flagged cells. Saved, untouched or finished games
+  can be left. A successful switch installs a fresh easy board, clears undo history,
+  resets/restarts the timer and clears both save tracking and pending save deletion.
+  Settings are subsequently read through the existing profile-ID-keyed cache.
+- `rename NUMBER NAME` writes a replacement registry entry before updating memory.
+  The UUID, data directory and existing statistics are retained, including for the active player.
+- `delete NUMBER` only displays a warning. Adding `confirm` removes an inactive entry;
+  deleting the active profile is rejected. Files stay under the old UUID and are not
+  reattached if the same display name is created again.
+
+The save-before-switch policy avoids silently assigning an existing game to another
+player. A resume-in-memory policy would require separate board/timer/history state per
+profile. Explicit deletion confirmation is simpler than keeping a pending profile number
+that can change after another deletion. Users should consult `profile list` immediately
+before confirming. File errors are reported without a success message; failed registry
+writes preserve the previous in-memory registry and active selection.
 
 #### Parsing and executing a command
 
@@ -223,6 +253,7 @@ EOF exits directly rather than invoking `ExitCommand`; see
 | `ParserAssertionsTest` | Enabled assertions, null factory results and invalid input. |
 | `ProfileStorageTest` | Temporary-directory persistence, duplicate names, invalid registries, retained files and failed writes. |
 | `ProfileRuntimeTest` | Startup selection/cancellation, recovery, shared session, overrides, rectangular limits and board replacement. |
+| `ProfileCommandTest` | Runtime routes, saved-progress switching, history/timer/settings isolation, deletion confirmation, retained files, rename statistics and failed writes. |
 
 | Decision | Alternative and trade-off |
 |---|---|
@@ -231,9 +262,8 @@ EOF exits directly rather than invoking `ExitCommand`; see
 | Write a candidate registry first | Mutating memory first would leave it ahead of disk after a failed write. |
 | Generic text storage | A single class owning every format couples profiles, saves and statistics. |
 
-Remaining profile work is the runtime command workflow, its progress-loss policy and
-preservation of existing statistics on rename. Save/load and statistics commands already
-exist and are described in their own sections below.
+Profile commands reuse the existing save/load and statistics interfaces; their file
+formats and result calculations remain described in the corresponding feature sections.
 
 
 ### Difficulty levels and dynamic boards
@@ -307,7 +337,7 @@ The statistics module tracks performance in the active profile's in-memory `Stat
 
 - **`Stats` Model**: Maintains counts for wins, losses, current win streaks, maximum win streaks, and a historical list of completion times.
 - **`GameTimer`**: Tracks elapsed duration using wall-clock millisecond timestamps (`System.currentTimeMillis()`). Commands start, stop or restore it; constructing a session alone does not start it.
-- **Persistence boundary**: `profiles.txt` stores profile IDs and names, not statistics. Each constructed `Profile` currently creates a fresh `Stats`. A future statistics file needs its own format, validation and load/save integration.
+- **Persistence boundary**: `profiles.txt` stores profile IDs and names, not statistics. Newly created/loaded profiles get fresh statistics; renaming an existing profile retains its current `Stats` object. A future statistics file needs its own format, validation and load/save integration.
 
 #### Command Summary & Syntax
 
@@ -440,7 +470,7 @@ Comparing the grid array by identity also stops plain `save` from overwriting th
 **Limitations and planned work:**
 
 - Pressing Ctrl-D (end of input) ends the loop without the unsaved-progress warning, because it bypasses commands. A future change could auto-save to a reserved slot on end of input.
-- Runtime profile switching, once added, must call `SaveTracker.confirmDiscard` before changing profile, since saves belong to one profile.
+- Runtime profile switching uses `SaveTracker.hasUnsavedChanges` to require saving unfinished progress before a switch, then resets the tracker for the new player. It does not use the load/exit discard-confirmation shortcut.
 - The `saves` and `delete NAME` commands call `SaveStore.list()` and `SaveStore.delete(name)` rather than building paths themselves; see [Gameplay quality-of-life features](#gameplay-quality-of-life-features).
 
 ### Gameplay quality-of-life features
@@ -620,6 +650,25 @@ For a registry-corruption check, use a second isolated test folder.
 Create and exit a test profile, then change only that folder's registry header to `invalid-header`.
 Relaunch: expect a registry error and no replacement registry. Do not run this check against real player data.
 
+### Runtime profile management
+
+Use a separate empty working directory and create `Zheng Yiting` at startup:
+
+1. Enter `profile create Guest`, then `profile list`. Expect two profiles with `Zheng Yiting`
+   still marked as current. `profile create guest` is rejected as a duplicate.
+2. Enter `f 1 1`, then `profile select 2`. Expect a save-first message and the original board.
+3. Enter `save profile-check`, then `profile select 2`. Expect Guest and a fresh easy board.
+   `undo` should report no history; plain `save` should require a name.
+4. Enter `profile rename 2 Guest New`. The active name changes; the board is unchanged.
+5. Enter `profile delete 2 confirm`. Deleting the active profile is rejected.
+6. Enter `profile select 1`, then `load profile-check`. The original flag is restored.
+7. Enter `profile delete 2`. The registry still contains Guest New. Enter
+   `profile delete 2 confirm`; it is removed, and any existing files under its UUID remain.
+8. Exit and relaunch. The retained profile and its save remain available; Guest New is absent.
+
+Use `ProfileCommandTest` to verify rename statistics, I/O failures and cross-profile
+confirmation isolation without depending on a random game result.
+
 ### Parser, dimensions and command chaining
 
 Run these commands in order after selecting a test profile:
@@ -662,7 +711,7 @@ These checks exercise the registered production commands. They do not imply that
 For each failed check, record the commit/JAR version, Java version, operating system, exact input sequence,
 expected result and observed output. Preserve only the isolated test data needed to reproduce it.
 The feature owners should extend these checks for timing, ranking, finished-game behaviour and malformed saved-game files.
-In-game profile commands and persistent statistics need additional tests when those features are implemented.
+Persistent statistics will need additional tests when that feature is implemented.
 
 ## Acknowledgements
 

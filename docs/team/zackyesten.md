@@ -19,13 +19,17 @@ foundation used by the team's features.
   [#34](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/34). Stable UUIDs keep data paths
   independent of display names. Registry changes are written before replacing memory,
   and malformed existing registries are reported rather than overwritten.
-  Runtime profile-management commands are remaining work, not part of this completed foundation.
+  Extended this foundation with runtime profile listing/creation/selection/renaming/deletion
+  for [#33](https://github.com/AY2627S1-CS2113-W10-4/tp/issues/33). Switching requires saved
+  progress and resets board history, timing and save confirmations; renaming preserves
+  existing statistics, while confirmed deletion retains associated files.
 - **Testing and diagnostics:** added parser, command, profile storage and startup tests,
-  including invalid input and temporary-directory I/O cases. Added assertions for internal
+  including invalid input, temporary-directory I/O cases and cross-profile state isolation.
+  Added assertions for internal
   assumptions and logging for command processing in
   [#27](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/27).
 - **User Guide:** documented startup profile selection, local profile persistence,
-  help/board usage and the current exit behaviour.
+  help/board usage, the current exit behaviour and runtime profile-management examples.
 - **Developer Guide:** wrote the command/profile implementation section in
   [#35](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/35), expanded documentation in
   [#48](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/48), and revised my diagrams and
