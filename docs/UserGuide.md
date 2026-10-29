@@ -399,3 +399,63 @@ Goodbye!
 | `save NAME` / `save` | Saves this game / re-saves it to the same name. |
 | `load NAME` | Continues a saved game; repeat it to confirm when warned. |
 
+Viewing your statistics: `stats`
+Shows the current profile's wins, losses, win rate, streaks and fastest time. A win or loss is recorded when a game ends.
+Format: `stats`
+Example:
+`stats`
+Expected output after one loss:
+```text
+> stats
+=== Statistics for: Tester ===
+Wins: 0
+Losses: 1
+Win Rate: 0.0%
+Current Streak: 0
+Max Streak: 0
+Fastest Time: N/A
+=========================================
+```
+`Current Streak` counts wins in a row and resets to 0 after a loss. `Max Streak` is your longest streak. `Fastest Time` is `N/A` until you win a game.
+> **Note:** Statistics are kept only while Jaweeper is running. They are reset when you exit.
+Clearing your statistics: `stats clear`
+Resets all statistics of the current profile. Other profiles are not affected.
+Format: `stats clear`
+Example:
+`stats clear`
+Expected output:
+```text
+> stats clear
+Statistics have been successfully cleared for profile: Tester
+```
+Any other extra word is rejected:
+```text
+> stats now
+Usage: stats or stats clear
+```
+Viewing the leaderboard: `leaderboard`
+Shows every profile's wins, losses and win rate, so players on the same computer can compare results.
+Format: `leaderboard`
+Example:
+`leaderboard`
+Expected output:
+```text
+> leaderboard
+================ LEADERBOARD ================
+Rank | Profile         | Wins   | Losses | Win Rate
+---------------------------------------------
+1    | Tester          | 0      | 1      | 0.0%
+=============================================
+```
+`leaderboard` takes no extra words:
+```text
+> leaderboard x
+Usage: leaderboard
+```
+<!-- FAQ entries to add -->
+Q: Do my statistics change when I rename my profile?
+A: No. Renaming keeps your statistics. They are only reset by `stats clear` or by exiting Jaweeper.
+<!-- Command Summary rows to add -->
+| `stats` | Shows your statistics. |
+| `stats clear` | Resets your statistics. |
+| `leaderboard` | Compares all profiles. |
