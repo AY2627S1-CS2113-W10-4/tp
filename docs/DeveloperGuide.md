@@ -330,6 +330,7 @@ The snapshot below is an easy game after two flags and one `undo`. The second fl
 `execute` does not change the board. If the game is already over, it prints `The game is over. Type 'new' to start a new game.` Otherwise it scans revealed safe cells. When a cell's adjacent flag count equals its number, every hidden unflagged neighbour is treated as safe, and the command prints the first such cell in one-based coordinates, for example `Try revealing cell (4, 7).` If no such cell exists, it prints `No safe cell can be deduced yet. Reveal more cells.` An empty, ragged or incomplete grid throws `IllegalArgumentException`; the command catches it, prints the message and returns, so the input loop continues. Assertions check that a chosen hint is inside the current dimensions and refers to a hidden, unflagged cell. They do not claim the cell is free of a mine, because that depends on the player's flags being correct.
 
 ### Statistics and Leaderboard Feature
+**Maintainer:** Matthew (M4ttL4m).
 
 The statistics module tracks performance in the active profile's in-memory `Stats` object. The current implementation does not persist these statistics across application launches.
 
