@@ -127,6 +127,90 @@ Usage: hint
 
 A hint can point at a mine if a flag is on the wrong cell. Correct the flags and ask again.
 
+### Starting a custom game: `new custom`
+
+Starts a new game with the number of rows, columns and mines you choose. The previous board is discarded and the undo history is cleared.
+
+Format: `new custom ROWS COLS MINES`
+
+* `ROWS` and `COLS` must be whole numbers from 5 to 50.
+* `MINES` must be at least 1 and fewer than `ROWS` × `COLS`.
+
+Example:
+
+`new custom 5 6 3`
+
+Expected output:
+
+```text
+> new custom 5 6 3
+New custom game started (5x6, 3 mines).
+Remaining Mines: 3
+      1   2   3   4   5   6
+    +---+---+---+---+---+---+
+  1 | . | . | . | . | . | . |
+```
+
+The full board has 5 rows. These inputs are rejected, and the current board stays as it is:
+
+```text
+> new custom 4 6 3
+Custom boards must be at least 5 by 5.
+
+> new custom 5 51 3
+Custom boards cannot exceed 50 by 50.
+
+> new custom 5 5 25
+Mines must be fewer than the number of cells.
+
+> new custom 5 5 0
+A custom board needs at least 1 mine.
+
+> new custom 5 x 3
+Rows, columns, and mines must be integers.
+
+> new custom 5 6
+Usage: new custom ROWS COLS MINES
+```
+
+### Undoing a move: `undo`
+
+Takes back your last reveal, flag or unflag. You can type `undo` several times to step further back. The timer keeps running.
+
+Format: `undo`
+
+Example: flag two cells, then undo the second flag.
+
+```text
+> f 1 1
+Cell (1, 1) flagged.
+Remaining Mines: 2
+...
+> f 1 2
+Cell (1, 2) flagged.
+Remaining Mines: 1
+...
+> undo
+Undid the last move.
+Remaining Mines: 2
+```
+
+The board is printed again after each line marked `...`. When there is nothing left to undo:
+
+```text
+> undo
+Nothing to undo.
+```
+
+`undo` takes no extra words:
+
+```text
+> undo please
+Usage: undo
+```
+
+`new custom` and switching profiles clear the undo history.
+
 ## FAQ
 
 **Q**: Which board do I get if I type `new`?
@@ -137,6 +221,10 @@ A hint can point at a mine if a flag is on the wrong cell. Correct the flags and
 
 **A**: No. It only prints a suggestion. Reveal that cell with `r ROW COL`, using the same row and column numbers.
 
+**Q**: Can I undo after hitting a mine?
+
+**A**: Yes. `undo` takes back the reveal that hit the mine, so you can keep playing that game. The loss is still counted in your statistics.
+
 ## Command Summary
 
 | Command | What it does |
@@ -146,3 +234,5 @@ A hint can point at a mine if a flag is on the wrong cell. Correct the flags and
 | `new medium` | Starts a 16×16 game with 40 mines. |
 | `new hard` | Starts a 16×30 game with 99 mines. |
 | `hint` | Prints one suggested safe cell, or says that none can be deduced. |
+| `new custom ROWS COLS MINES` | Starts a custom game (5–50 rows and columns, at least 1 mine). |
+| `undo` | Takes back your last reveal, flag or unflag. |
