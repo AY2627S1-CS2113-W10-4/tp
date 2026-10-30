@@ -86,7 +86,7 @@ public class ProfileManager {
         Profile original = getProfile(id);
         String validatedName = Profile.validateName(name);
         requireUniqueName(validatedName, id);
-        Profile renamed = new Profile(original.getId(), validatedName);
+        Profile renamed = original.withName(validatedName);
         Map<String, Profile> updated = new LinkedHashMap<>(profiles);
         updated.put(id, renamed);
         saveProfiles(updated);

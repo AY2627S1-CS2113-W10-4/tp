@@ -1,0 +1,62 @@
+@startuml UndoObjectDiagram
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceParticipant underline false
+title After undo of the second flag
+
+object "undoCommand : UndoCommand" as undoCommand
+object "session : GameSession" as session {
+    safeClickEnabled = true
+    settingsProfileId = "9f3c2a"
+}
+object "timer : GameTimer" as timer {
+    elapsedMillis = 45000
+    isRunning = true
+}
+object "liveBoard : Board" as liveBoard {
+    rows = 9
+    cols = 9
+    totalMines = 10
+    gameState = IN_PROGRESS
+    isFirstMove = true
+}
+object "flaggedCell : Cell" as flaggedCell {
+    isMine = false
+    isRevealed = false
+    isFlagged = true
+    adjacentMines = 1
+}
+object "clearedCell : Cell" as clearedCell {
+    isMine = false
+    isRevealed = false
+    isFlagged = false
+    adjacentMines = 2
+}
+object "history : Stack" as history {
+    size = 1
+}
+object "savedBoard : Board" as savedBoard {
+    rows = 9
+    cols = 9
+    totalMines = 10
+    gameState = IN_PROGRESS
+    isFirstMove = true
+}
+object "savedCell : Cell" as savedCell {
+    isMine = false
+    isRevealed = false
+    isFlagged = false
+    adjacentMines = 1
+}
+
+undoCommand --> "session" session
+session --> "board" liveBoard
+session --> "gameTimer" timer
+session --> "boardHistory" history
+liveBoard --> "grid[0][0]" flaggedCell
+liveBoard --> "grid[0][1]" clearedCell
+history --> "element" savedBoard
+savedBoard --> "grid[0][0]" savedCell
+@enduml

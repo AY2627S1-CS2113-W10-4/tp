@@ -3,7 +3,7 @@ package seedu.jaweeper;
 import java.util.UUID;
 
 /**
- * An immutable local profile whose ID stays unchanged when its name changes.
+ * A local profile with immutable identity/name and mutable session statistics.
  */
 public final class Profile {
 
@@ -15,12 +15,24 @@ public final class Profile {
      * Constructs a profile using a canonical UUID and a validated display name.
      */
     public Profile(String id, String name) {
+        this(id, name, new Stats());
+    }
+
+    private Profile(String id, String name, Stats stats) {
         if (id == null || !UUID.fromString(id).toString().equals(id)) {
             throw new IllegalArgumentException("Profile ID must be a canonical UUID.");
         }
         this.id = id;
         this.name = validateName(name);
-        this.stats = new Stats();
+        this.stats = stats;
+    }
+
+    /**
+     * Returns a renamed profile sharing the same ID and existing statistics.
+     * The registry can persist this candidate before replacing the original.
+     */
+    public Profile withName(String replacementName) {
+        return new Profile(id, replacementName, stats);
     }
 
     /**

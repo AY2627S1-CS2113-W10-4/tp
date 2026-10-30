@@ -20,6 +20,11 @@ public class HelpCommand extends Command {
         printEntry("saves", "List your saved games.");
         printEntry("delete NAME", "Delete a saved game (type it twice to confirm).");
         System.out.println("Player:");
+        printEntry("profile list", "List profiles and mark the current player.");
+        printEntry("profile create NAME", "Create a profile without switching players.");
+        printEntry("profile select NUMBER", "Switch to a fresh easy board; save progress first.");
+        printEntry("profile rename NUMBER NAME", "Rename a profile, keeping its ID and statistics.");
+        printEntry("profile delete NUMBER confirm", "Remove an inactive profile; data files are retained.");
         printEntry("stats", "Show your statistics ('stats clear' resets them).");
         printEntry("leaderboard", "Show the leaderboard.");
         printEntry("settings", "Show your settings.");

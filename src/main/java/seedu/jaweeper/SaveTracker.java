@@ -26,6 +26,17 @@ public class SaveTracker {
     private List<String> pendingSnapshot;
 
     /**
+     * Clears the previous player's save name and pending discard confirmation.
+     * Called after a successful profile switch starts a fresh board.
+     */
+    public void reset() {
+        trackedGrid = null;
+        savedSnapshot = null;
+        currentSaveName = null;
+        clearPending();
+    }
+
+    /**
      * Records that the board now matches the save called {@code name}.
      */
     public void markSaved(Board board, String name) {

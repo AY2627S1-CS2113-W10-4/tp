@@ -1,6 +1,6 @@
 # Jaweeper v2.0 shared runtime contract
 
-This document describes the foundation and runtime wiring supplied by Zack. It does not mean that save/load, statistics, variable-size boards, chained commands, or unsaved-game protection are implemented.
+This document describes the profile foundation and runtime wiring maintained by Zheng Yiting. Save/load, statistics, variable-size boards, settings and chained commands now use the shared session; their domain logic belongs to the corresponding feature owners.
 
 ## Shared state
 
@@ -15,7 +15,7 @@ The application then constructs one `GameSession(board, manager)` and passes tha
 - `session.getProfileDirectory()` returns `data/profiles/<UUID>/` as an absolute `Path`; it does not create that directory.
 - The underlying `ProfileManager.getActiveProfile()` returns `Optional<Profile>`. This differs intentionally from the session's selected-profile accessor.
 
-Profile IDs do not change on rename. Runtime profile switching is not implemented yet. Until progress-handling rules are integrated, commands must not switch the active profile while a game is underway.
+Profile IDs do not change on rename, and `Profile.withName` retains the existing in-memory `Stats` object. Runtime switching is handled by `ProfileCommand`: it refuses a different player while `SaveTracker.hasUnsavedChanges` is true. A successful switch creates a fresh easy board, resets/restarts the timer, clears undo history, calls `SaveTracker.reset()` and clears saved-game deletion confirmation. Do not call `ProfileManager.selectProfile` directly during play and bypass these steps. Selecting the current profile is a no-op.
 
 ## Storage ownership
 
@@ -25,32 +25,32 @@ Profile IDs do not change on rename. Runtime profile switching is not implemente
 
 Recommended independent locations:
 
-- Registry: `data/profiles.txt` -- Zack.
+- Registry: `data/profiles.txt` -- Zheng Yiting.
 - Named saves: `session.getProfileDirectory().resolve("saves")` -- Yong Xiang.
-- Statistics: `session.getProfileDirectory().resolve("stats.txt")` -- Matthew.
+- Statistics: `session.getProfileDirectory().resolve("stats.txt")` -- proposed location for Matthew's future persistence; current statistics are in memory only.
 - Profile settings, if persisted: `session.getProfileDirectory().resolve("settings.txt")` -- ZW.
 
 Only the UUID is safe as a profile path component. Each feature must validate its own user-provided save names/paths and its own file contents. Renaming a profile must not rename its UUID directory.
 
-Inactive-profile deletion currently removes the registry record and retains feature files. Active-profile deletion is blocked. Recreating the same display name creates a new UUID and does not reconnect retained files. User confirmation and any future cleanup policy belong in the later profile UI work.
+Inactive-profile deletion removes the registry record and retains feature files. Active-profile deletion is blocked. Recreating the same display name creates a new UUID and does not reconnect retained files. `profile delete NUMBER` explains this without deleting; `profile delete NUMBER confirm` confirms removal. Numbers refer to the current `profile list`. Runtime `profile create NAME` creates without switching; startup `create NAME` still selects the created profile.
 
 ## Command contract and registration
 
 `Command.execute(Board board)` is unchanged. A command requiring profile or session state accepts `GameSession` in its constructor and stores it in an instance field. Do not use static/global profile state or construct another manager per command. The `board` argument is the current board at execution time.
 
-The registration point is `Jaweeper.createFeatureCommands(GameSession session)`. It initially contains no registrations because teammates' v2.0 classes do not exist in this branch yet. Supply a factory with this shape:
+The registration point is `Jaweeper.createFeatureCommands(GameSession session)`. Existing feature routes are registered here. Factories have this shape:
 
 ```java
 Function<String[], Command>
 ```
 
-For example, once the corresponding implementation exists:
+For example, the save route shares one tracker with load, exit and profile commands:
 
 ```java
-commands.put("save", arguments -> SaveCommand.parse(arguments, session));
+commands.put("save", arguments -> SaveCommand.parse(arguments, session, saveTracker));
 ```
 
-`SaveCommand.parse` above is an example of the feature owner's factory, not an existing API. Supply the actual class/factory signature to Zack for registration.
+Reuse the existing tracker; do not create a tracker for each parsed command.
 
 - Keys must be lowercase.
 - Factories receive argument tokens only, without the command name; argument case is preserved.
@@ -62,10 +62,10 @@ commands.put("save", arguments -> SaveCommand.parse(arguments, session));
 - Factories must not perform gameplay or disk mutations; return a command to perform the operation in `execute`.
 - `execute` still cannot declare checked `IOException`. Catch file errors inside the feature command, report the failure, and do not report a successful save/load or update success flags afterward.
 - A cancelled exit must return false from `isExit()`. Return true only after exit was actually accepted.
-- The parser currently splits on whitespace only: no quoting, semicolon splitting, or escaping. Names containing spaces can be reconstructed by a profile factory from its remaining tokens. ZW owns any later chained-command behaviour and should coordinate the common line-dispatch hook with Zack.
+- The main loop splits semicolon-separated commands, then parses each segment immediately before execution. The parser splits on whitespace; quoting and escaping are not supported. The profile factory reconstructs a name from its remaining tokens using single spaces.
 - EOF currently ends the game loop directly. An exit command override does not intercept EOF; coordinate any EOF warning policy separately.
 
-Zack coordinates changes to the central registry and parser. Feature owners can test immediately by passing their own feature map to:
+Zheng Yiting coordinates changes to the central registry and parser. Feature owners can test by passing their own feature map to:
 
 ```java
 Jaweeper.run(input, session, coordinateFactories, featureFactories);
@@ -77,14 +77,14 @@ Existing `r`, `f`, and `u` factories continue to receive zero-based `(row, colum
 
 The production loop validates coordinates using the current session's row and column counts on every input. After `replaceBoard`, it uses the replacement's dimensions. The current adapter reads `board.grid.length` and `board.grid[0].length` and assumes a nonempty rectangular grid. If Pranav encapsulates grid, update only these two GameSession adapter methods to use his public dimension getters.
 
-Legacy `Parser.parse` overloads retain `Board.SIZE` for compatibility with existing tests. Production uses the dimension-aware overload. This change alone does not make the existing Board algorithms support custom sizes; that remains Pranav's feature.
+Legacy `Parser.parse` overloads use `Difficulty.EASY.rows` and `Difficulty.EASY.cols`. Production uses the dimension-aware overload, including after a profile switch installs an easy board.
 
 ## Responsibilities still belonging to feature owners
 
 - Yong Xiang: saved-game format/validation, save/load, unsaved-state tracking, and exit/progress-loss rules. Coordinate hooks for `new`, `load`, profile switching and EOF; the shared session is not itself dirty tracking.
-- Matthew: timers, game-result accounting, statistics persistence and leaderboard logic. Coordinate the post-command/new-game hooks with Zack when the required service methods are available; merely having a session does not record results automatically.
+- Matthew: timers, game-result accounting, statistics persistence and leaderboard logic. Coordinate shared hooks with Zheng Yiting; merely having a session does not record results automatically.
 - Pranav: difficulty/custom boards and remaining-mine display.
 - ZW: safe-click options, show-mines-on-loss, chained commands, clear, and save listing/deletion through Yong Xiang's save service.
-- Zack: profile CLI operations, startup, central registration, integration and documentation.
+- Zheng Yiting: profile CLI operations, startup, central registration, integration and documentation.
 
 These boundaries allow implementation and unit testing in parallel. Integration still requires matching each feature's actual factory signature and agreed cross-feature behaviour.

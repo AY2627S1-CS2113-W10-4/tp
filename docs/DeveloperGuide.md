@@ -1,327 +1,401 @@
-# Developer Guide
+# Jaweeper Developer Guide
+
+* Table of Contents
+  * [Acknowledgements](#acknowledgements)
+  * [Setting up, getting started](#setting-up-getting-started)
+  * [Design](#design)
+  * [Implementation](#implementation)
+  * [Documentation, logging, testing, dev-ops](#documentation-logging-testing-dev-ops)
+  * [Appendix: Requirements](#appendix-requirements)
+  * [Appendix: Instructions for manual testing](#appendix-instructions-for-manual-testing)
+
+--------------------------------------------------------------------------------------------------------------------
 
 ## Acknowledgements
 
-{list here sources of all reused/adapted ideas, code, documentation, and third-party libraries -- include links to the original source as well}
+* This project is based on the [NUS CS2113 tP template](https://github.com/NUS-CS2113-AY2627-S1/tp).
+* The structure of this guide follows the [AddressBook-Level3 Developer Guide](https://se-education.org/addressbook-level3/DeveloperGuide.html).
+* Libraries and tools used: [JUnit 5](https://junit.org/), [Gradle](https://gradle.org/) with the [Shadow plugin](https://gradleup.com/shadow/), [Checkstyle](https://checkstyle.org/) and [PlantUML](https://plantuml.com/).
 
-## Design & implementation
+--------------------------------------------------------------------------------------------------------------------
 
-### Statistics and Leaderboard Feature
+## Setting up, getting started
 
-The statistics module tracks player performance metrics per profile, ensuring that personal scores are preserved independently across sessions.
+1. Install **JDK 25** and Git, then clone the repository.
+1. Open the root folder as a Gradle project in your IDE. Use the committed Gradle wrapper.
+1. Run `./gradlew check shadowJar` (`.\gradlew.bat check shadowJar` on Windows). This runs the tests and Checkstyle, and builds `build/libs/jaweeper.jar`.
+1. Run `java -ea -jar build/libs/jaweeper.jar`. The `-ea` flag enables assertions.
 
-#### Architecture and Components
-- **`Stats` Model**: Maintains counts for wins, losses, current win streaks, maximum win streaks, and a historical list of completion times.
-- **`GameTimer`**: Records high-precision elapsed game duration using system timestamps (`System.currentTimeMillis()`), which is automatically triggered on game start and processed upon victory.
-- **Persistence**: Profile-specific statistics are serialized and stored independently under each player's designated directory (e.g., `data/profiles/<UUID>/stats.txt`) via the `Storage` subsystem.
+--------------------------------------------------------------------------------------------------------------------
 
-#### Command Summary & Syntax
+## Design
 
-| Command | Format | Description | Example |
-| :--- | :--- | :--- | :--- |
-| **Stats** | `stats` | Displays performance metrics for the currently active profile (win rate, streaks, recent times). | `stats` |
-| **Stats Clear** | `stats clear` | Resets all recorded wins, losses, streaks, and times for the active profile. | `stats clear` |
-| **Leaderboard** | `leaderboard` | Compiles and ranks all registered profiles by win count and completion times. | `leaderboard` |
+> **Tip:** The `.puml` files used to create the diagrams in this document are in the [`docs/diagrams`](https://github.com/AY2627S1-CS2113-W10-4/tp/tree/master/docs/diagrams) folder. Every diagram includes `style.puml` so that all diagrams share one style. To update a diagram, edit its `.puml` file and render it into `docs/images/`, e.g. `java -jar plantuml.jar -tpng -o ../images docs/diagrams/Undo.puml`.
 
-### Command processing and profile sessions
+### Architecture
 
-**Maintainer:** Zack (zackyesten).
-**Implementation baseline:** the foundation and runtime integration merged in [PR #34](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/34).
+![Architecture Diagram](images/ArchitectureDiagram.png)
 
-This section explains how Jaweeper selects a local player, turns text input into commands, and gives commands access to the same current board and profile. It documents the implemented foundation, not the complete planned v2.0 feature set. In-game profile management commands, save/load, statistics and progress-loss confirmation are not provided by this foundation.
+The ***Architecture Diagram*** given above explains the high-level design of Jaweeper.
 
-#### Architecture and responsibilities
+Given below is a quick overview of the main components and how they interact with each other.
 
-The implementation separates input coordination, command construction, shared state and file access. These are logical responsibilities within the same Java package, not separate processes or independently deployed components.
+**Main components of the architecture**
 
-| Responsibility | Main classes | Boundary |
-|---|---|---|
-| Application startup and execution | `Jaweeper`, `ProfileStartup` | Own the input loop and startup selection; delegate feature logic to commands. |
-| Input interpretation | `Parser` | Validate syntax and coordinates, then construct a command without executing it. |
-| Shared runtime state | `GameSession` | Hold the current `Board` and one shared `ProfileManager`. |
-| Profile management | `ProfileManager`, `Profile` | Maintain stable player identities, the registry and the session-only active selection. |
-| Text persistence | `Storage` | Read/write UTF-8 text; do not interpret saved games or calculate statistics. |
+**`Jaweeper`** (in the UI component) is in charge of the app launch and the input loop.
+* At app launch, it opens the profile registry, asks the player to choose a profile, and creates the shared `GameSession`.
+* It then reads commands until the player exits.
 
-`Jaweeper.main` creates a `ProfileManager` using the working-directory-relative path `data`. Only after startup selection succeeds does it create the initial board and `GameSession`. The session-aware `run` method then delegates to the common execution loop. The older `run(Scanner, Board, ...)` overload remains available for existing tests and does not perform profile selection.
+The rest of the app consists of four components.
 
-#### Profile component structure
+* [**`UI`**](#ui-component): Reads user input and shows output in the terminal.
+* [**`Logic`**](#logic-component): Turns input into commands and executes them.
+* [**`Model`**](#model-component): Holds the data of the app in memory.
+* [**`Storage`**](#storage-component): Reads data from, and writes data to, text files.
 
-![Class diagram showing the shared session, profile registry and storage dependencies](images/zack-profile-classes.svg)
+[**`Commons`**](#common-classes) represents a collection of classes used by multiple other components.
 
-*Figure 1. Selected members and relationships of the profile component. Solid directed associations denote retained references; dashed dependencies denote use. ProfileStartup and Storage expose static operations. Multiplicities show one manager and one current board per session, and zero or more profiles in the registry. This is a focused diagram, not the complete application class model.*
+**How the architecture components interact with each other**
 
-A `Profile` is immutable: its ID and name are final. Renaming replaces the profile object in the manager's map while preserving its UUID. The active selection stores the ID rather than an old object reference, so subsequent lookups obtain the renamed profile. Consumers should similarly obtain the current profile when needed instead of caching an old display-name object.
+The *Sequence Diagram* below shows how the components interact with each other for the scenario where the user issues the command `save trip`.
 
-`GameSession` holds one replaceable board reference. Following `replaceBoard(validatedBoard)`, the next command receives the replacement through `getBoard()`. Replacement itself does not validate saved-game contents, handle unsaved progress or update timers. Those operations remain the responsibility of the calling feature.
+![Architecture Sequence Diagram](images/ArchitectureSequenceDiagram.png)
 
-#### Startup selection and profile persistence
+Every command follows the same pattern: `Parser` creates a `Command`, and the command's `execute(Board)` uses the `Model` and, if needed, `Storage`. Commands get everything other than the board (the session, the save tracker) through their constructors.
 
-At the startup prompt, `create NAME` creates and explicitly selects a profile; `select NUMBER` selects an entry from the displayed list. The displayed number is a temporary user-facing index, not the persistent identity. `exit` or end-of-input cancels startup before a board is created. Invalid choices are reported and the prompt repeats.
+### UI component
 
-`ProfileManager.createProfile` alone does not select its result. Keeping these operations separate lets another caller create a profile without changing the current player. Startup deliberately performs both operations. Active selection is not written to disk, so the next launch prompts again.
+**API** : [`Jaweeper.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/Jaweeper.java), [`ProfileStartup.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/ProfileStartup.java)
 
-The registry is a human-readable UTF-8 file, `data/profiles.txt`. Its first line is `profiles-v1`; each following line contains a canonical UUID, a tab, and a display name. Names are trimmed, must contain 1–30 permitted characters, and must start with a letter or digit. Unicode letters/digits, spaces, underscores and hyphens are allowed; tabs and line breaks are not. Name uniqueness ignores case.
+![Structure of the UI Component](images/UiClassDiagram.png)
 
-A missing registry means first-time use. An existing empty file, invalid header, malformed record, duplicate ID or duplicate name is instead an error. Startup must not silently replace such a file with an empty registry. Permission and other read errors are also reported, rather than interpreted as "no profiles".
+The UI component,
 
-For a registry change, the manager builds a candidate map, serializes it, and calls `Storage.writeLines` before replacing its in-memory map. Storage creates parent directories and writes a temporary file alongside the target, then attempts an atomic replacement. A non-atomic replacement is used if atomic moves are unsupported. This reduces exposure to partially written files but is not a universal crash-recovery guarantee or a multi-process transaction system.
+* asks the player to `create NAME` or `select NUMBER` a profile at launch (`ProfileStartup`).
+* reads one line at a time, splits it on `;`, and passes each part to the `Logic` component (`Jaweeper.runLine`).
+* prints any error message from a rejected command and keeps the loop running.
+* shows the board through `Board.printBoard()`, which commands call after changing the board.
 
-A player's feature data belongs under `data/profiles/<UUID>/`. Changing a display name does not change this path. The directory accessor does not create it; a subsequent storage write creates parents as needed. The foundation's delete operation rejects the active profile and removes only an inactive profile's registry record. Associated feature files are retained. A future deletion UI must explain that behaviour rather than claim all data was erased.
+### Logic component
 
-#### Command parsing and execution
+**API** : [`Parser.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/Parser.java), [`Command.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/Command.java)
 
-For each command on an input line (a line may chain several commands, see [Gameplay quality-of-life features](#gameplay-quality-of-life-features)), the session-aware loop reads the current board dimensions and passes them to `Parser.parse`. Command names are lowercased with `Locale.ROOT`; argument case is preserved.
+Here's a (partial) class diagram of the `Logic` component:
 
-Dispatch follows this order:
+![Structure of the Logic Component](images/LogicClassDiagram.png)
 
-1. If a matching lowercase key exists in the feature registry, invoke its `Function<String[], Command>` factory with the argument tokens, excluding the command name.
-2. Otherwise, handle built-in `help`, `exit`, `new` and `board`. `help`, `exit` and `board` reject extra arguments. `new` accepts an optional difficulty word, described under [Difficulty levels and dynamic boards](#difficulty-levels-and-dynamic-boards). (`clear` is also a built-in, but its case is currently commented out; see [The clear command](#the-clear-command-temporarily-disabled).)
-3. For `r`, `f` and `u`, validate two integer coordinates against separate row/column limits, convert from one-based input to zero-based indices, and invoke the registered coordinate factory.
+`XYZCommand` is a placeholder for a specific command such as `SaveCommand` or `FlagCommand`.
 
-Unknown commands and invalid arguments produce `IllegalArgumentException` messages. The loop displays the message and continues. Factories construct commands; they must not mutate gameplay or perform persistence as a parsing side effect.
+How the `Logic` component works:
 
-![Sequence diagram for parsing and executing the existing flag command](images/zack-command-sequence.svg)
+1. `Parser.parse` lowercases the command word and looks for a **feature factory** registered in `Jaweeper.createFeatureCommands(session)`.
+1. If there is none, it handles the built-in commands `help`, `exit`, `new` and `board`, and finally `r`, `f` and `u`, whose coordinates are checked against the current board size and converted to zero-based values.
+1. The factory validates the arguments and returns a `Command` object. It does not change the game.
+1. `Jaweeper` calls `execute(board)` on the command, then `isExit()` to decide whether to stop.
 
-*Figure 2. Successful processing of `f 2 3`. The board has at least two rows and three columns. Scanner calls, logging, lambda adapters and the internals of flagging are omitted to keep the diagram focused. The call to parse represents the invocation through the loop's parsing function. Dashed arrows are returns; the command instance begins at its creation message.*
+> **Note:** Any `IllegalArgumentException` thrown while parsing or executing is printed, and the loop continues. To add a command, create a `Command` subclass with a static `parse(String[] arguments, GameSession session)` and register it in `Jaweeper.createFeatureCommands(session)`, reusing the existing `session`.
 
-The parser converts the coordinates to `(1, 2)` before calling the flag factory. It returns the resulting command to the loop, which obtains the current board immediately before `execute(board)`. After successful execution, the loop checks `isExit()`. A false result continues the loop; a true result ends it. An `IllegalArgumentException` thrown during execution is also reported and the loop continues, but the loop does not roll back any mutations already made by that command.
+### Model component
 
-Existing commands keep the `Command.execute(Board)` contract. A feature that also needs profiles can accept `GameSession` in its constructor. Registration in `Jaweeper.createFeatureCommands(session)` supplies that same session to its factory. `hint` is registered there and does not replace a built-in command.
+**API** : [`GameSession.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/GameSession.java)
 
-Feature registrations take precedence over built-ins. For example, registering `new` would take over both `new easy` and plain `new`, so its factory must define both cases. Whitespace tokenization does not implement quoting. Semicolon-separated chains are split by the execution loop before parsing, so `Parser` itself still handles exactly one command per call.
+![Structure of the Model Component](images/ModelClassDiagram.png)
 
-#### Defensive checks and error boundaries
+The `Model` component,
 
-User input is checked with ordinary conditionals and exceptions, not assertions. For example, invalid coordinate text is rejected even when Java assertions are disabled. Assertions instead document internal invariants, including validated coordinate bounds and non-null results from command factories. Gradle's test and run tasks enable assertions; a direct JAR launch can use `java -ea -jar jaweeper.jar`.
+* stores the current game as a `Board` of `Cell` objects, together with the undo history (`boardHistory`) and the `GameTimer`.
+* stores all local players in the `ProfileManager`, which keeps `Profile` objects in creation order and remembers the active one.
+* stores each player's results in a `Stats` object. Statistics are kept in memory only.
+* caches the active player's safeclick setting in `GameSession`.
 
-Session/profile preconditions also have distinct meanings: `ProfileManager.getActiveProfile()` returns an `Optional`, while `GameSession.getActiveProfile()` throws `IllegalStateException` if startup selection was omitted. Session construction and board replacement reject null references.
+### Storage component
 
-The application logs session start/end at INFO and command dispatch/rejected input at FINE. It does not log complete user command lines for these dispatch messages. Startup registry read failures are reported without replacing the registry. Because `execute(Board)` does not declare checked I/O exceptions, future file-based commands must handle their own `IOException` and must not report success after a failed write.
+**API** : [`Storage.java`](https://github.com/AY2627S1-CS2113-W10-4/tp/blob/master/src/main/java/seedu/jaweeper/Storage.java)
 
-EOF currently ends the game loop directly; it does not execute an exit command. Therefore, a future override of `exit` alone will not implement EOF progress-loss handling.
+![Structure of the Storage Component](images/StorageClassDiagram.png)
 
-#### Design decisions and alternatives
+The `Storage` component,
 
-| Decision | Alternative considered | Reason and trade-off |
-|---|---|---|
-| Stable UUID identity, separate from display name | Use the name as a filename/key | Renames do not break save/statistics references; IDs are less convenient for users, so startup displays numbered names. |
-| Pass one GameSession to feature commands | Static global state or a new manager per command | Explicit sharing is easier to isolate in tests and avoids independent active selections; constructors need an extra dependency. |
-| Preserve execute(Board) and add feature factories | Rewrite every command to accept a new context | Existing commands/tests remain compatible; profile-aware commands carry session state in addition to receiving the board. |
-| Save a candidate registry before replacing the in-memory map | Mutate the map and then write | A failed write does not make memory claim that a registry update succeeded; replacement requires a temporary copy. |
-| Generic text storage | One storage class owning profiles, boards and statistics | Each owner controls their format without expanding one shared class; each feature must supply its own validation and error policy. |
-
-#### Verification and remaining work
-
-The automated tests separate parser behaviour, startup interaction and file-system state:
-
-- `CoreCommandsTest` and `GameplayRoutingTest` cover the existing command routes and zero-based coordinate conversion.
-- `ParserAssertionsTest` checks enabled assertions, a null command-factory result, and invalid-input exceptions.
-- `ProfileStorageTest` uses JUnit temporary directories to exercise persistence, duplicate names, malformed registries, retained feature files and failed-write behaviour.
-- `ProfileRuntimeTest` covers startup creation/selection, cancellation, recovery from invalid input, shared session access, feature overrides, rectangular coordinate limits and board replacement.
-
-Run `./gradlew clean build` (Windows: `.\gradlew.bat clean build`) before submitting changes. The rectangular routing test checks the parser/session adapter; it is not evidence that all Board algorithms already support rectangular games.
-
-This foundation does not yet supply in-game profile create/select/rename/delete commands, deletion confirmations, unsaved-game protection, saved-game restoration or statistics updates. Difficulty presets and `hint` are described in the next section. The session loop reads the current board's row and column counts through `GameSession`. Legacy `Parser.parse` overloads validate coordinates against the easy preset. Later features must update the relevant integration points and their documentation when behaviour changes.
-
-See [the integration contract](ProfileIntegration.md) for the factory interface and ownership boundaries. Other team members should add their own implementation sections alongside this one.
-
-### Difficulty levels and dynamic boards
-
-**Maintainer:** Pranav (ProNoob116).
-
-A game is no longer fixed at 9×9 with 10 mines. `Board` stores `rows`, `cols` and `totalMines`, and mine placement, adjacency counts, flood fill, victory checking and printing all use those values. The public `Board.SIZE` and `Board.MINES` constants remain only so existing tests can still describe the easy board. New code should use `getRows()`, `getCols()` and `getTotalMines()`.
-
-`Difficulty` holds the three presets:
-
-| Preset | Command | Rows | Columns | Mines |
-|---|---|---|---|---|
-| `EASY` | `new` or `new easy` | 9 | 9 | 10 |
-| `MEDIUM` | `new medium` | 16 | 16 | 40 |
-| `HARD` | `new hard` | 16 | 30 | 99 |
-
-The no-argument `Board` constructor delegates to `Difficulty.EASY`. `new` with no difficulty word does the same.
-
-#### Class structure
-
-`Parser` recognises the difficulty word and constructs a `NewGameCommand`. That command stores one `Difficulty` and, on execution, builds a sized `Board`, then copies the new grid into the board object the session already holds. `GameSession` therefore keeps the same `Board` reference. The next command sees the new dimensions through `getRowCount()` and `getColumnCount()`, which read `grid.length` and `grid[0].length`.
-
-```plantuml
-@startuml new-hard-class-diagram
-skinparam classAttributeIconSize 0
-skinparam shadowing false
-title New hard command
-
-enum Difficulty {
-    EASY
-    MEDIUM
-    HARD
-    + rows : int
-    + cols : int
-    + mines : int
-}
-
-abstract class Command {
-    + {abstract} execute(board : Board)
-    + isExit() : boolean
-}
-
-class NewGameCommand {
-    - difficulty : Difficulty
-    + NewGameCommand()
-    + NewGameCommand(difficulty : Difficulty)
-    + execute(board : Board)
-}
-
-class Parser {
-    + {static} parse(input, coordinateCommands, featureCommands, rows, columns) : Command
-    - {static} parseNewCommand(words : String[]) : Command
-}
-
-class Board {
-    - rows : int
-    - cols : int
-    - totalMines : int
-    + grid : Cell[][]
-    - gameState : GameState
-    - isFirstMove : boolean
-    + Board()
-    + Board(rows : int, cols : int, totalMines : int)
-    + copyStateFrom(freshBoard : Board)
-    + getRows() : int
-    + getCols() : int
-    + getTotalMines() : int
-    + printBoard()
-    + setGameState(gameState : GameState)
-}
-
-class GameSession {
-    - board : Board
-    + getBoard() : Board
-}
-
-class Cell
-enum GameState {
-    IN_PROGRESS
-    WON
-    LOST
-}
-
-NewGameCommand -up-|> Command
-NewGameCommand --> "1" Difficulty
-NewGameCommand ..> Board : creates and copyStateFrom
-Parser ..> NewGameCommand : creates
-Parser ..> Difficulty
-Board --> "rows * cols" Cell
-Board --> GameState
-Board ..> Difficulty : no-arg constructor uses EASY
-GameSession --> "1" Board : same instance mutated by new hard
-@enduml
-```
-
-*Figure 3. Classes involved in `new hard`. The source file is [diagrams/new-hard-class-diagram.puml](diagrams/new-hard-class-diagram.puml). Solid arrows are retained associations. Dashed arrows are use. `GameSession` keeps one `Board`; `new hard` changes that object instead of replacing the session's reference.*
-
-#### Processing `new hard`
-
-`new hard` is a built-in command, not a feature-factory command. The loop still passes the current dimensions into `Parser.parse`, but those dimensions are used only for `r`, `f` and `u`. They do not choose the size of the new game.
-
-1. The feature map is checked first. There is no factory named `new`, so parsing continues to the built-in switch. A teammate who later registers `new` takes over `new hard` as well and must handle the difficulty word in that factory.
-2. `parseNewCommand` accepts either one token (`new`) or two tokens. The second token is lowercased with `Locale.ROOT`. `hard` selects `Difficulty.HARD` and returns `new NewGameCommand(Difficulty.HARD)`. Any other word, or a third token, throws `IllegalArgumentException` with `Usage: new [easy|medium|hard]`. The loop prints that message and does not change the board.
-3. `execute` sets the existing board's state to `GameState.IN_PROGRESS`, then constructs `new Board(16, 30, 99)`. That constructor allocates the grid, places 99 mines and calculates adjacencies. The first reveal on this board is still protected by the existing safe-first-click behaviour.
-4. `copyStateFrom` copies `rows`, `cols`, `totalMines`, `grid` and `isFirstMove` into the session's board. It does not call `GameSession.replaceBoard`.
-5. The command prints `New hard game started.` and `printBoard()`. The header reports `Remaining Mines: 99`, and the grid is labelled through row 16 and column 30.
-6. `isExit()` is false, so the loop prompts again. Later coordinate commands are checked against the new grid size.
-
-```plantuml
-@startuml new-hard-sequence-diagram
-title Successful new hard
-hide footbox
-
-participant "Jaweeper.runLoop" as Loop
-participant Parser
-participant NewGameCommand
-participant "Difficulty.HARD" as Hard
-participant "existing Board" as Board
-participant "new Board(16, 30, 99)" as Fresh
-
-Loop -> Parser : parse("new hard", empty feature map, dimensions)
-Parser -> Parser : no feature factory named new
-Parser -> Parser : parseNewCommand matches hard
-Parser -> NewGameCommand : new NewGameCommand(HARD)
-NewGameCommand --> Hard : rows = 16, cols = 30, mines = 99
-Parser --> Loop : command
-
-Loop -> NewGameCommand : execute(session board)
-NewGameCommand -> Board : setGameState(IN_PROGRESS)
-NewGameCommand -> Fresh : new Board(16, 30, 99)
-activate Fresh
-Fresh -> Fresh : place 99 mines and calculate adjacencies
-NewGameCommand -> Board : copyStateFrom(fresh)
-note right of Board
-  Copies rows, cols, totalMines,
-  grid, and isFirstMove.
-  GameSession keeps this Board.
-end note
-NewGameCommand -> Board : print "New hard game started."
-NewGameCommand -> Board : printBoard()
-NewGameCommand --> Loop
-Loop -> NewGameCommand : isExit()
-NewGameCommand --> Loop : false
-Loop -> Loop : prompt for the next command
-@enduml
-```
-
-*Figure 4. Successful processing of `new hard`. The source file is [diagrams/new-hard-sequence-diagram.puml](diagrams/new-hard-sequence-diagram.puml). Scanner reads, logging and the mine-placement loops are omitted. Dashed arrows are returns.*
-
-`new easy` and a bare `new` follow the same path with `Difficulty.EASY` and the message `New easy game started.` `new medium` uses `Difficulty.MEDIUM` and prints `New medium game started.`
-
-#### Hint command
-
-`hint` is separate from difficulty selection. `Jaweeper.createFeatureCommands` registers it under the lowercase name `hint`, so the feature factory runs before the built-in switch and the command cannot be confused with `new`. `HintCommand.create` rejects extra arguments with `Usage: hint`.
-
-`execute` does not change the board. If the game is already over, it prints `The game is over. Type 'new' to start a new game.` Otherwise it scans revealed safe cells. When a cell's adjacent flag count equals its number, every hidden unflagged neighbour is treated as safe, and the command prints the first such cell in one-based coordinates, for example `Try revealing cell (4, 7).` If no such cell exists, it prints `No safe cell can be deduced yet. Reveal more cells.` An empty, ragged or incomplete grid throws `IllegalArgumentException`; the command catches it, prints the message and returns, so the input loop continues. Assertions check that a chosen hint is inside the current dimensions and refers to a hidden, unflagged cell. They do not claim the cell is free of a mine, because that depends on the player's flags being correct.
-
-### Saving and loading games
-
-**Maintainer:** Yong Xiang (yongxiang22).
-
-This feature lets a player save an unfinished game to a readable text file and continue it later with the time already spent. Before quitting or loading, the player is warned if the current game has unsaved moves. Corrupted or hand-edited save files are rejected without touching the game in progress.
-
-#### Overview
-
-The feature adds five classes and makes small additions to four existing ones. Figure 3 shows how they fit together.
-
-![Class diagram of the save/load component](images/SaveLoadClassDiagram.png)
-
-*Figure 3. Classes of the save/load component and the existing classes they use. Only the members discussed below are shown.*
-
-| Class | Responsibility |
-|---|---|
-| `SaveCommand`, `LoadCommand` | Parse their arguments when the command is created (no file access) and carry out the operation in `execute`. |
-| `SaveStore` | Owns save-name rules and file locations, `data/profiles/<UUID>/saves/<name>.txt`. Provides `save`, `load`, `list`, `delete` and `exists`. Uses the shared `Storage` helper for the actual reading and writing. |
-| `GameSaveCodec` | Converts a `Board` plus elapsed time to save-file lines and back, validating every line on the way in. Knows nothing about files or paths. |
-| `SaveTracker` | Remembers the position at the last save or load and decides whether the current game has unsaved progress. |
-| `SaveFileException` | A checked exception whose message is shown to the player as-is. |
-
-`Jaweeper.createFeatureCommands` creates **one** `SaveTracker` and passes it to the `save`, `load` and `exit` factories, so all three agree on what was last saved. The `exit` registration overrides the built-in `exit`; the no-argument `ExitCommand()` constructor still quits immediately, so existing tests are unaffected.
-
-Two small hooks were added to existing classes: `Board.restore(...)` builds a board from given cells without placing random mines, and `GameTimer.resumeFrom(ms)` / `getElapsedMillis()` let the timer continue from a saved duration.
-
-#### Saving a game
-
-Figure 4 shows what happens when the player types `save trip`.
-
-![Sequence diagram for save trip](images/SaveSequenceDiagram.png)
-
-*Figure 4. Successful `save trip`. Logging, the overwrite check and the failed-write branch are omitted.*
-
-1. The parser passes `["trip"]` to `SaveCommand.parse`, which checks and lowercases the name. The name may contain only letters, digits, `_` and `-`, so it can never contain `/` or `..` and escape the saves folder. Windows-reserved names such as `con` and `nul` are also rejected.
-2. `execute` refuses finished games, since there is nothing left to continue and the result is already recorded in the statistics.
-3. `SaveStore` asks `GameSaveCodec.encode` for the file contents, then writes them with `Storage.writeLines`. `Storage` writes to a temporary file first, so a failed write leaves any previous save intact.
-4. Only after the write succeeds does `SaveCommand` call `tracker.markSaved`. If the write throws an `IOException`, the command prints the error and does **not** mark the game as saved, so the exit warning still protects the player's progress.
-
-Plain `save` (no name) re-saves to the name this game was last saved to or loaded from, which `SaveTracker.getCurrentSaveName` provides.
-
-#### Save file format
+* reads and writes UTF-8 text files through `Storage`. `writeLines` writes a temporary file first and then moves it into place.
+* saves the profile registry to `data/profiles.txt` (`ProfileManager`).
+* saves each player's settings to `data/profiles/<UUID>/settings.txt` (`ProfileSettings`).
+* saves each player's games to `data/profiles/<UUID>/saves/<name>.txt` (`SaveStore`, `GameSaveCodec`).
+
+### Common classes
+
+Classes used by multiple components are in the `seedu.jaweeper` package. Examples are `Difficulty` (the board presets), `GameState` (`IN_PROGRESS`, `WON`, `LOST`) and `SaveFileException`.
+
+--------------------------------------------------------------------------------------------------------------------
+
+## Implementation
+
+This section describes some noteworthy details on how certain features are implemented. Each feature has a class diagram, an object diagram and a sequence diagram. Logging is omitted from all sequence diagrams.
+
+### Flagging a cell
+
+Flagging a cell (`f ROW COL`) is used here to show how any coordinate command is parsed and executed. Unflagging (`u`) and revealing (`r`) follow the same path.
+
+The class diagram below shows the classes involved.
+
+![Command processing class diagram](images/CommandClassDiagram.png)
+
+Given below is an example usage scenario and how the mechanism behaves at each step.
+
+Step 1. The player types `f 2 3` on a 9×9 board. `Jaweeper.runLine` reads the current board size from the session and calls `Parser.parse("f 2 3", ..., 9, 9)`.
+
+Step 2. `parseCoordinates` checks that there are two integers from 1 to 9, converts them to the zero-based `1, 2`, and calls the registered coordinate factory, which constructs `FlagCommand(session, 1, 2)`.
+
+Step 3. `Jaweeper` calls `execute(board)`. The command first pushes a copy of the board onto the session's undo history, then flags the cell and prints the board.
+
+The sequence diagram below shows Steps 1 to 3.
+
+![Command processing sequence diagram](images/CommandSequenceDiagram.png)
+
+The object diagram below shows the objects just after Step 3. The copy (`before`) still has `grid[1][2]` unflagged.
+
+![Command processing object diagram](images/CommandObjectDiagram.png)
+
+> **Note:** `FlagCommand` rejects the move, printing a message, if the game is over or the cell is already revealed or flagged.
+
+#### Design considerations:
+
+**Aspect: Where arguments are validated**
+
+* **Alternative 1 (current choice):** Factories validate and construct; `execute` changes state.
+  * Pros: Nothing in the game changes until the whole command is known to be valid.
+  * Cons: Each command needs a separate `parse` method.
+* **Alternative 2:** Parse and execute in one step.
+  * Pros: Fewer methods.
+  * Cons: A badly formed command could change the game before the error is found.
+
+### Switching profiles
+
+A profile is a local player with a stable UUID, a display name and in-memory statistics. At launch, `ProfileStartup` asks the player to create or select one. During play, `profile list|create|select|rename|delete` is handled by `ProfileCommand`.
+
+![Profile class diagram](images/ProfileClassDiagram.png)
+
+Every change to the registry goes through `ProfileManager.saveProfiles`, which writes `data/profiles.txt` **before** updating the in-memory map. `profiles.txt` starts with the header `profiles-v1`, followed by one `UUID<TAB>name` line per profile.
+
+Given below is an example usage scenario of `profile select 2`.
+
+Step 1. Zheng Yiting is playing, and Guest is profile 2. `ProfileCommand.execute` looks up profile 2 in the current list. The number is only a position in the list; the UUID is the real identity.
+
+Step 2. If the target is already active, nothing happens. Otherwise `SaveTracker.hasUnsavedChanges` is checked. If there is unsaved progress, the switch is blocked with a message asking the player to save first.
+
+Step 3. With no unsaved progress, a fresh easy `Board` is created, Guest is selected, and the session's board, undo history, timer and save tracking are all reset.
+
+![Profile sequence diagram](images/ProfileSequenceDiagram.png)
+
+The object diagram below shows the objects after Step 3. Both profiles stay in the registry; only `activeProfileId` changed (UUIDs are shortened).
+
+![Profile object diagram](images/ProfileObjectDiagram.png)
+
+> **Note:** `profile create NAME` adds a profile without switching. `profile rename NUMBER NAME` keeps the UUID and the same `Stats` object. `profile delete NUMBER confirm` removes an inactive profile from the registry but keeps its files.
+
+#### Design considerations:
+
+**Aspect: What happens to an unfinished game when switching**
+
+* **Alternative 1 (current choice):** Require the player to save first.
+  * Pros: A game is never silently given to another player; simple to implement.
+  * Cons: The player must type `save NAME` before switching.
+* **Alternative 2:** Keep one board per profile in memory.
+  * Pros: Switching back resumes instantly.
+  * Cons: Needs a separate board, timer and undo history per profile.
+
+**Aspect: How a profile's data folder is named**
+
+* **Alternative 1 (current choice):** Use the profile's UUID.
+  * Pros: Renaming a profile does not move its data.
+  * Cons: Folder names are not human-readable.
+* **Alternative 2:** Use the display name.
+  * Pros: Easy to find a player's files.
+  * Cons: Breaks when a profile is renamed.
+
+### Creating a board
+
+`new [easy|medium|hard]` starts a preset game and `new custom ROWS COLS MINES` starts a custom one. `EASY` is 9×9 with 10 mines, `MEDIUM` is 16×16 with 40, and `HARD` is 16×30 with 99.
+
+![Board class diagram](images/BoardClassDiagram.png)
+
+`Board` stores its own `rows`, `cols` and `totalMines`, so all board logic works for any size. `CustomGameCommand.validate` accepts dimensions from 5 to 50 and a mine count from 1 to cells − 1.
+
+Given below is an example usage scenario of `new hard`.
+
+Step 1. The `new` factory receives `["hard"]` and constructs `NewGameCommand(session, HARD)`. Any other word throws `Usage: new [easy|medium|hard]` and the current board is kept.
+
+Step 2. `execute` builds `Board(16, 30, 99)`, which places 99 mines at random and counts adjacent mines.
+
+Step 3. `copyStateFrom` copies the size, cells, state and first-move flag into the board the session already holds. The timer restarts and the new board is printed.
+
+![Board sequence diagram](images/BoardSequenceDiagram.png)
+
+The object diagram below shows the objects just after `copyStateFrom`. `copied` and `original` are different `Cell` objects with the same values.
+
+![Board object diagram](images/BoardObjectDiagram.png)
+
+> **Note:** `new custom R C M` follows the same steps through `CustomGameCommand` and also clears the undo history. The first reveal of either board is protected by [safeclick](#changing-the-safeclick-setting).
+
+#### Design considerations:
+
+**Aspect: How the new board is installed**
+
+* **Alternative 1 (current choice):** Copy the new board's state into the existing `Board` object.
+  * Pros: Every holder of the board reference sees the new game.
+  * Cons: Builds a temporary second board.
+* **Alternative 2:** Replace the session's board with `replaceBoard`.
+  * Pros: No copying.
+  * Cons: Any object still holding the old reference would see a stale board.
+
+### Undoing a move
+
+`undo` restores the board as it was before the last reveal, flag or unflag.
+
+![Undo class diagram](images/UndoClassDiagram.png)
+
+Given below is an example usage scenario and how the undo mechanism behaves at each step.
+
+Step 1. The player flags one cell. Before flagging, `FlagCommand` calls `session.pushBoardHistory(board)`, which pushes `board.deepCopy()` onto `boardHistory`.
+
+Step 2. The player flags a second cell. Another copy, now containing the first flag, is pushed.
+
+Step 3. The player types `undo`. `undoLastMove` pops the top copy and copies it onto the live board with `copyStateFrom`.
+
+![Undo sequence diagram](images/UndoSequenceDiagram.png)
+
+The object diagram below shows the objects after Step 3. The second flag is gone, and the stack still holds the board from before the first flag. The timer keeps running.
+
+![Undo object diagram](images/UndoObjectDiagram.png)
+
+> **Note:** If the history is empty, `undo` prints `Nothing to undo.` `new custom` and switching profiles clear the history. A preset `new` currently does not, so `undo` straight after it brings back the last board of the previous game.
+
+#### Design considerations:
+
+**Aspect: How undo states are stored**
+
+* **Alternative 1 (current choice):** Save a full copy of the board before each move.
+  * Pros: Easy to implement and always correct.
+  * Cons: Uses more memory on large boards.
+* **Alternative 2:** Each command knows how to undo itself.
+  * Pros: Uses less memory.
+  * Cons: Every command needs its own undo logic, which is easy to get wrong (e.g. flood fill).
+
+### Getting a hint
+
+`hint` names one hidden cell that the revealed numbers and flags prove to be safe. It never changes the board.
+
+![Hint class diagram](images/HintClassDiagram.png)
+
+Given below is an example usage scenario.
+
+Step 1. The top-left corner of the board is as shown in the object diagram below. `c00` is revealed with the number 1 and already has one flagged neighbour, `c01`.
+
+![Hint object diagram](images/HintObjectDiagram.png)
+
+Step 2. The player types `hint`. `findSafeCell` scans revealed safe cells in row order. For `c00`, the number of flagged neighbours equals its number, so its other hidden neighbours must be safe.
+
+Step 3. The first such neighbour, `c10`, is returned and `Try revealing cell (2, 1).` is printed.
+
+![Hint sequence diagram](images/HintSequenceDiagram.png)
+
+> **Note:** A hint assumes the player's flags are correct. If no cell qualifies, `No safe cell can be deduced yet. Reveal more cells.` is printed.
+
+#### Design considerations:
+
+**Aspect: How safe cells are deduced**
+
+* **Alternative 1 (current choice):** Use only the single-cell rule (flags around a number equal the number).
+  * Pros: Simple and fast.
+  * Cons: Cannot find hints that need reasoning over several cells.
+* **Alternative 2:** Solve constraints across the whole board.
+  * Pros: Finds more hints.
+  * Cons: Much more complex to implement and test.
+
+### Recording a game result
+
+When a reveal ends the game, the timer stops and the active profile's `Stats` are updated.
+
+![Result class diagram](images/ResultClassDiagram.png)
+
+Given below is an example usage scenario.
+
+Step 1. The player reveals a cell. If it is a mine, `revealMine` sets the state to `LOST`, stops the timer and calls `recordLoss()`, which resets the current streak.
+
+Step 2. If it is safe, `revealSafeCell` flood-fills from the cell. If every safe cell is now revealed, the state becomes `WON`, the timer stops, and `recordWin(seconds)` increments wins and the streak and stores the time.
+
+![Result sequence diagram](images/ResultSequenceDiagram.png)
+
+The object diagram below shows the objects after Zheng Yiting wins her third game in 83 seconds.
+
+![Result object diagram](images/ResultObjectDiagram.png)
+
+> **Note:** Statistics are kept in memory only and are lost when the app exits. `recordWin` is given seconds, but `StatsCommand` formats the fastest time as milliseconds, so it currently shows `00:00`.
+
+#### Design considerations:
+
+**Aspect: Where results are recorded**
+
+* **Alternative 1 (current choice):** `RevealCommand` records the result when it ends the game.
+  * Pros: The result is recorded exactly once, at the moment the game ends.
+  * Cons: `RevealCommand` depends on `Stats` and `GameTimer`.
+* **Alternative 2:** The input loop checks for a finished game after every command.
+  * Pros: Commands stay simpler.
+  * Cons: The loop must remember whether a result was already recorded.
+
+### Viewing the leaderboard
+
+`stats` shows the active profile's statistics, `stats clear` resets them, and `leaderboard` compares all profiles.
+
+![Leaderboard class diagram](images/LeaderboardClassDiagram.png)
+
+Given below is an example usage scenario of `leaderboard` with the two profiles in the object diagram below.
+
+![Leaderboard object diagram](images/LeaderboardObjectDiagram.png)
+
+Step 1. The command copies the profile list from the `ProfileManager`, so it can be sorted without changing the registry.
+
+Step 2. The list is sorted by wins, with win rate breaking ties.
+
+Step 3. One row is printed per profile: rank, name, wins, losses and win rate.
+
+![Leaderboard sequence diagram](images/LeaderboardSequenceDiagram.png)
+
+> **Note:** The comparator currently calls `reversed()` twice, so the profile with the fewest wins is listed first. It should be `comparingInt(wins).thenComparingDouble(winRate).reversed()`.
+
+#### Design considerations:
+
+**Aspect: Sorting the leaderboard**
+
+* **Alternative 1 (current choice):** Sort a copy of the profile list each time.
+  * Pros: The registry's creation order, used for profile numbers, is never changed.
+  * Cons: Sorts on every call (negligible for a few local profiles).
+* **Alternative 2:** Keep a sorted list updated after every game.
+  * Pros: No sorting when displaying.
+  * Cons: Must be kept in step with every win, loss and `stats clear`.
+
+### Saving a game
+
+`save NAME` writes the current unfinished game to a readable text file. Plain `save` re-saves to the name the game was last saved to or loaded from.
+
+![Save class diagram](images/SaveClassDiagram.png)
+
+`SaveStore` owns save names and the folder `data/profiles/<UUID>/saves/`. `GameSaveCodec` converts a board and its elapsed time to file lines and back, and knows nothing about files. `SaveTracker` remembers the position at the last save or load.
+
+Given below is an example usage scenario of `save trip`.
+
+Step 1. `SaveCommand.parse` lowercases the name and allows only letters, digits, `_` and `-`, so a name can never contain `/` or `..`. Windows-reserved names such as `con` are rejected.
+
+Step 2. `execute` refuses a finished game. Otherwise `SaveStore.save` asks `GameSaveCodec.encode` for the lines and writes them with `Storage.writeLines`.
+
+Step 3. Only after a successful write does the command call `tracker.markSaved`. If the write fails, the game is not marked as saved, so `exit` still warns the player.
+
+![Save sequence diagram](images/SaveSequenceDiagram.png)
+
+The object diagram below shows the objects after Step 3. The tracker refers to the **same** grid array as the board, and keeps the grid's rows as text. Comparing both later tells it whether the game has changed.
+
+![Save object diagram](images/SaveObjectDiagram.png)
+
+The save file is readable. For a 3×4 board:
 
 ```
 jaweeper-save-v1
@@ -335,225 +409,512 @@ board
 checksum 623d2492
 ```
 
-| Symbol | Meaning |
-|---|---|
-| `.` | Hidden cell, no mine |
-| `x` | Hidden mine |
-| `f` | Flag on a safe cell |
-| `F` | Flag on a mine |
-| `0`–`8` | Revealed safe cell, showing its adjacent-mine count |
+`.` is a hidden safe cell, `x` a hidden mine, `f` a flag on a safe cell, `F` a flag on a mine, and `0`–`8` a revealed safe cell. The last line is a CRC32 checksum of all lines above it.
 
-The board section looks like the game board itself, so a developer can read a save while debugging. The last line is a CRC32 checksum of every line above it, written as 8 lowercase hex digits.
+#### Design considerations:
 
-#### Loading a game
+**Aspect: Save file format**
 
-Figure 5 shows `load trip`, including the two places where loading can stop.
+* **Alternative 1 (current choice):** Readable text with a CRC32 checksum.
+  * Pros: Easy to read while debugging; damage and hand edits are detected.
+  * Cons: Not tamper-proof against someone who recomputes the checksum.
+* **Alternative 2:** Java serialisation.
+  * Pros: Less code.
+  * Cons: Unreadable, and breaks when classes change.
 
-![Sequence diagram for load trip](images/LoadSequenceDiagram.png)
+### Loading a game
 
-*Figure 5. `load trip`. The outer `alt` is the file check; the inner `alt` is the unsaved-progress check. `Storage.readLines` is shown as a self-call to keep the diagram narrow.*
+`load NAME` replaces the current game with a saved one and continues its timer.
 
-The key design point is the **order**: `LoadCommand` reads and fully decodes the file *before* asking for confirmation or replacing anything. Only after both checks pass does it call `replaceBoard`, `resumeFrom` and `markSaved`. A failed load therefore leaves the current game exactly as it was.
+![Load class diagram](images/LoadClassDiagram.png)
 
-`GameSaveCodec.decode` never trusts the file. It rejects the file with a message naming the line, where possible, if:
+Given below is an example usage scenario of `load trip`.
 
-1. The header `jaweeper-save-v1` is missing or different.
-2. The checksum line is missing or does not match. This catches truncated files, disk damage and hand edits.
-3. The `size`, `mines` or `elapsed-ms` line is malformed, including signs, non-digits and over-long numbers.
-4. Rows or columns are outside 1–99, or the mine count is outside 1 to (cells − 1).
-5. A board row has the wrong length or an unknown symbol, or there are too many or too few rows.
-6. The number of mines in the grid differs from the `mines` line.
-7. A revealed number does not match the recalculated count. `Board.restore` always recalculates adjacency itself, so the file's numbers are only checked, never used.
-8. Every safe cell is already revealed, which means the game is finished.
+Step 1. `SaveStore.load` reads the file and `GameSaveCodec.decode` validates every line. It throws `SaveFileException`, naming the line where possible, if the header is wrong, the checksum does not match, a number is malformed or out of range, a row has the wrong length or an unknown symbol, the mine count differs, a revealed number is wrong, or the game is already finished. The current game is then left unchanged.
 
-The checksum is checked first so a hand-edited file gets a clear "changed outside Jaweeper" message. Checks 3–8 still matter: they catch files written by a buggy future version, and they stop bad data from reaching `Board`'s assertions.
+Step 2. `SaveTracker.confirmDiscard` protects unsaved progress, as shown in the activity diagram below. The first request only prints a warning; repeating the **same** request with no move in between confirms it.
 
-Whether a game was saved before its first reveal is worked out from the grid (no revealed cells), so the safe-first-click rule still applies after loading such a game.
+![Confirm discard activity diagram](images/ConfirmDiscardActivityDiagram.png)
 
-#### Detecting unsaved progress
+Step 3. Only then are the board replaced, the timer resumed and the tracker updated.
 
-Rather than adding a `markDirty()` call to every command that changes the board, `SaveTracker` compares the board with a snapshot taken at the last save or load. Figure 6 shows the decision made by `confirmDiscard`, which both `exit` and `load` call.
+![Load sequence diagram](images/LoadSequenceDiagram.png)
 
-![Activity diagram for confirmDiscard](images/ConfirmDiscardActivityDiagram.png)
+The object diagram below shows the objects after Step 3.
 
-*Figure 6. How `SaveTracker.confirmDiscard` decides whether `exit` or `load` may go ahead.*
+![Load object diagram](images/LoadObjectDiagram.png)
 
-- `markSaved(board, name)` stores a reference to the board's grid array and the grid's encoded rows.
-- A board has unsaved changes if the game is unfinished, at least one cell is revealed or flagged, and either the grid is a **different array** from the snapshot (`new` or another load replaced it) or its rows differ.
-- The first progress-losing request remembers the action (`"exit"` or `"load trip"`) and the current position, prints a warning and returns `false`. Repeating the **same** action with no move in between returns `true`. Any move, or a different action, needs a fresh confirmation.
+> **Note:** Ending input with Ctrl-D leaves the loop without the unsaved-progress warning.
 
-Comparing the grid array by identity also stops plain `save` from overwriting the previous game's file after `new`, because `NewGameCommand` installs a fresh grid array through `copyStateFrom`. The comparison is one pass over the grid per `exit`, `load` or `save`, which is negligible for boards up to 99×99.
+#### Design considerations:
 
-#### Design decisions and alternatives
+**Aspect: When the current game is replaced**
 
-| Decision | Alternative considered | Reason and trade-off |
-|---|---|---|
-| Readable text with a CRC32 checksum | Binary or Java serialisation | Readable files help debugging and suit the course's text-file requirement. CRC32 detects edits and damage but is not tamper-proof against someone who recomputes it; that is acceptable for a single-player game. |
-| Recalculate adjacency on load | Trust the numbers in the file | One source of truth; the stored digits still keep the file readable and act as an extra consistency check. |
-| Validate everything before replacing the board | Load cell by cell into the live board | No half-loaded game on error, at the cost of building a second board in memory. |
-| Snapshot comparison for unsaved changes | A dirty flag set by each command | No changes to teammates' commands, and new commands are covered automatically. |
-| Type the same command twice to confirm | A separate `y/n` prompt | Works within the existing one-line-per-command loop with no new input mode; the trade-off is a less familiar confirmation style. |
-| Lowercase, restricted save names | Free-form names | Prevents path traversal (`../`), Windows-reserved names, and names that differ only in case colliding on Windows and macOS. |
+* **Alternative 1 (current choice):** Validate the whole file before replacing anything.
+  * Pros: A bad file can never leave a half-loaded game.
+  * Cons: Builds a second board in memory.
+* **Alternative 2:** Load cell by cell into the live board.
+  * Pros: Less memory.
+  * Cons: An error part-way through corrupts the current game.
 
-#### Testing and known limitations
+**Aspect: How unsaved progress is detected**
 
-- `GameSaveCodecTest` covers round trips (including a random 16×30 board), checksum tampering and truncation. It also tests each content check above using files with a *valid* checksum, so only the content check can catch the problem.
-- `SaveLoadCommandsTest` uses JUnit temporary folders to test the store, name validation, saving and loading, re-saving, refusing finished games, keeping the current game after a bad load, both confirmation flows, and a full run through `Jaweeper.run`.
+* **Alternative 1 (current choice):** Compare the board with a snapshot taken at the last save or load.
+  * Pros: No changes to other commands; new commands are covered automatically.
+  * Cons: One pass over the grid per check (negligible for boards up to 99×99).
+* **Alternative 2:** A dirty flag set by every command that changes the board.
+  * Pros: Constant-time check.
+  * Cons: Every current and future command must remember to set it.
 
-**Limitations and planned work:**
+### Showing all mines after a loss
 
-- Pressing Ctrl-D (end of input) ends the loop without the unsaved-progress warning, because it bypasses commands. A future change could auto-save to a reserved slot on end of input.
-- Runtime profile switching, once added, must call `SaveTracker.confirmDiscard` before changing profile, since saves belong to one profile.
-- The `saves` and `delete NAME` commands call `SaveStore.list()` and `SaveStore.delete(name)` rather than building paths themselves; see [Gameplay quality-of-life features](#gameplay-quality-of-life-features).
+After a loss, the board shows every mine and marks wrong flags.
 
-### Gameplay quality-of-life features
+![Loss class diagram](images/LossClassDiagram.png)
 
-**Maintainer:** Zhe Wen (zzzwun).
+Given below is an example usage scenario.
 
-This section covers five additions that make the game nicer to play: showing every mine after a loss, a per-profile safeclick setting, chaining several commands on one line, listing and deleting saved games, and an updated `help`. It also documents `clear`, which is implemented but currently disabled.
+Step 1. The player reveals a mine. `revealMine` sets the state to `LOST` before printing the board.
 
-#### Command summary & syntax
+Step 2. While printing, `Board.iconFor` checks the state. Unflagged mines are drawn as `*` and flags on safe cells as `X`. Every other cell is drawn with `Cell.getIcon()`.
 
-| Command | Format | Description | Example |
-| :--- | :--- | :--- | :--- |
-| **Settings** | `settings` | Shows the active profile's settings. | `settings` |
-| **Safeclick** | `settings safeclick on\|off` | Turns the guaranteed-safe first reveal on or off for the active profile. Saved across launches. | `settings safeclick off` |
-| **Saves** | `saves` | Lists the active profile's saved games alphabetically. | `saves` |
-| **Delete** | `delete NAME` | Deletes a saved game. Must be typed twice to confirm. | `delete trip` |
-| **Chaining** | `COMMAND; COMMAND; ...` | Runs several commands from one input line. | `f 1 1; f 2 3` |
-| **Clear** *(disabled)* | `clear` | Clears the terminal. | `clear` |
+![Loss sequence diagram](images/LossSequenceDiagram.png)
 
-#### Showing all mines after a loss
+The object diagram below shows the four kinds of cell on a lost board. `hit` and `hidden` are drawn as `*`, `wrongFlag` as `X`, and `rightFlag` as `F`.
 
-`RevealCommand.revealMine` sets the game state to `LOST` and then calls `board.printBoard()`. While the state is `LOST`, `Board.iconFor(cell)` chooses what each cell looks like, instead of always using `Cell.getIcon()`:
+![Loss object diagram](images/LossObjectDiagram.png)
 
-| Cell | Shown as |
-|---|---|
-| Mine, not flagged | `*` |
-| Flag on a safe cell | `X` |
-| Flag on a mine | `F` (unchanged) |
-| Anything else | Whatever `Cell.getIcon()` returns |
+#### Design considerations:
 
-This is display only: no `isRevealed` flag is changed. That keeps `calculateCompletionPercentage`, the statistics and any later snapshot of the grid unaffected by the loss screen. The `board` command shows the same view for as long as the game stays lost, and `new` resets the state, so mines are hidden again in the next game.
+**Aspect: How mines are shown**
 
-#### Safeclick setting
+* **Alternative 1 (current choice):** Choose the symbol in `printBoard` while the state is `LOST`.
+  * Pros: No cell changes, so completion figures and statistics are unaffected.
+  * Cons: The display rule lives in `Board` rather than `Cell`.
+* **Alternative 2:** Set `isRevealed` on every mine.
+  * Pros: `Cell.getIcon()` already draws revealed mines.
+  * Cons: Changes the game data and cannot show wrong flags.
 
-| Class | Responsibility |
-|---|---|
-| `SettingsCommand` | Parses `settings` and `settings safeclick on\|off` when created (no file access) and displays or changes the setting in `execute`. |
-| `ProfileSettings` | Reads and writes `data/profiles/<UUID>/settings.txt`. Static methods only; knows nothing about commands. |
-| `GameSession` | `isSafeClickEnabled()` and `setSafeClickEnabled(boolean)`. Caches the value for the active profile so a reveal does not read a file. |
-| `Board`, `RevealCommand` | On the first reveal, `RevealCommand` calls `ensureSafeFirstClick` if safeclick is on, or the new `skipSafeFirstClick` if it is off. |
+### Changing the safeclick setting
 
-The file is two lines: the header `jaweeper-settings-v1`, then `safeclick on` or `safeclick off`. It is kept apart from `profiles.txt` on purpose, because the registry is strictly validated and a change to its format would affect every profile.
+`settings safeclick on|off` decides whether the first reveal of a game is guaranteed to be safe. The value is saved per profile.
 
-How the value is read and written:
+![Settings class diagram](images/SettingsClassDiagram.png)
 
-- A missing, unreadable or malformed file means the default (on). The file is not overwritten until the player changes a setting, so a hand-edited file is not silently destroyed.
-- `setSafeClickEnabled` writes the file first and only then updates the cached value, the same policy as the profile registry. If the write fails, `SettingsCommand` reports the error and nothing changes.
-- The cache is keyed by the active profile's ID, so selecting another profile in the same session reads that profile's own value.
-- With no session (legacy test usage) or no active profile, safeclick is on, which matches the behaviour before this feature.
+`ProfileSettings` reads and writes `data/profiles/<UUID>/settings.txt`, which holds the header `jaweeper-settings-v1` and the line `safeclick on` or `safeclick off`. `GameSession` caches the value together with the profile ID it belongs to.
 
-`skipSafeFirstClick` clears the board's first-move flag without moving any mines. Without it, turning safeclick off would leave the flag set, and a later reveal could still trigger the mine relocation. The setting is checked when the first reveal happens, so a game that has not been revealed yet follows the current value, while a game already in progress is unaffected.
+Given below is an example usage scenario of `settings safeclick off`.
 
-#### Command chaining
+Step 1. `setSafeClickEnabled(false)` writes the file first. Only after it succeeds are the cached value and its profile ID updated. If the write fails, the error is printed and nothing changes.
 
-`Jaweeper.runLoop` now hands each input line to `runLine`, which uses `splitChain` to split it on `;` and then runs each segment in turn:
+Step 2. On the first reveal of the next game, `RevealCommand` calls `skipSafeFirstClick` instead of `ensureSafeFirstClick`, so the first reveal can hit a mine.
 
-1. `splitChain` trims each segment and drops empty ones, so `f 1 1;; f 2 3;` works. A line with no commands at all is passed through unchanged so the parser still reports "Enter a command".
-2. Each segment is parsed **just before it runs**, not all up front. This matters because the board can change partway through a line: in `new hard; f 15 29`, the coordinate `15 29` is only valid on the 16×30 board that `new hard` creates. Parsing lazily lets `Parser` validate against the board as it is at that moment.
-3. If parsing or executing a segment throws `IllegalArgumentException`, the message is printed and the **next segment still runs**.
-4. If a segment is an accepted `exit`, the loop ends and later segments are not run.
-5. If the game ends during a segment (a win or a loss) and more segments remain, they are skipped and one line says how many. Without this, every remaining `r`, `f` or `u` would print its own "The game is over" message.
+![Settings sequence diagram](images/SettingsSequenceDiagram.png)
 
-`Parser` is unchanged and still handles one command per call. Doing the split in the loop means both `run` overloads, including the legacy test entry point, get chaining.
+The object diagram below shows the objects after Step 1.
 
-Two consequences to be aware of. First, `exit; exit` counts as the confirming repeat for the unsaved-progress warning, because `SaveTracker.confirmDiscard` compares the action and the board position, not how many input lines were typed. `delete x; delete x` behaves the same way. Second, `;` cannot appear inside a command's arguments; this is already true because save names allow only letters, digits, `_` and `-`.
+![Settings object diagram](images/SettingsObjectDiagram.png)
 
-#### Listing and deleting saves
+> **Note:** A missing or malformed settings file means the default (on), and the file is not overwritten until the player changes the setting.
 
-`SavesCommand` calls `SaveStore.list()` and prints the names, or a hint to use `save NAME` if there are none. `DeleteCommand` uses `SaveStore.exists` and `SaveStore.delete`. Both work only inside the active profile's saves folder, as `SaveStore` already guarantees.
+#### Design considerations:
 
-`delete NAME` follows the same "type it twice" convention as `exit` and `load`:
+**Aspect: Where the setting is stored**
 
-1. If no save has that name, a message is printed and any pending confirmation is cleared.
-2. Otherwise, the first request prints a permanent-deletion warning and remembers the name.
-3. Typing the same `delete NAME` again deletes the file. Requesting a different name replaces the remembered one, so each save needs its own confirmation.
+* **Alternative 1 (current choice):** A separate `settings.txt` per profile.
+  * Pros: The strictly validated `profiles.txt` format is unchanged.
+  * Cons: One more file to read and write.
+* **Alternative 2:** An extra column in `profiles.txt`.
+  * Pros: One file for all profile data.
+  * Cons: A format change affects every profile.
 
-Command objects are created fresh for every input line, so the remembered name lives in a `DeleteCommand.Confirmation` object. `Jaweeper.createFeatureCommands` creates one and passes it to every `delete` command, in the same way it shares one `SaveTracker`. `SaveTracker.confirmDiscard` is not reused here because it asks "does the current board have unsaved moves?", which is unrelated to deleting a file.
+### Chaining commands
 
-`delete` also calls the new `SaveTracker.forgetSave(name)`. If `name` is the save that the current game was last saved to or loaded from, the tracker forgets it. The game then counts as unsaved again, so `exit` warns, and a plain `save` has no name to reuse and asks for one. `forgetSave` returns whether it did this, and `DeleteCommand` prints a note when it did. Because deleting does not decode the file, a corrupted save that cannot be loaded can still be deleted.
+Several commands can be typed on one line, separated by `;`, for example `new hard; f 15 29`.
 
-#### The clear command (temporarily disabled)
+![Chain class diagram](images/ChainClassDiagram.png)
 
-`ClearCommand` prints the ANSI sequence `ESC[H ESC[2J ESC[3J` (move the cursor home, erase the screen, erase the scrollback) and flushes. It does not touch the game state and does not reprint the board.
+Given below is an example usage scenario of `new hard; f 15 29`.
 
-The command is currently disabled in three places. To re-enable it, uncomment all three:
+Step 1. `splitChain` splits the line on `;`, trims each part and drops empty parts.
 
-- the `case "clear"` branch in `Parser.parse`,
-- the `clear` line in `HelpCommand`,
-- `@Disabled` on `clear_printsAnsiClearSequence_andKeepsBoard` in `ClearAndHelpCommandTest`.
+Step 2. Each part is parsed against the **current** board size just before it runs. `f 15 29` is therefore checked against the 16×30 board that `new hard` created.
 
-Terminals that understand ANSI codes clear correctly. Some IDE consoles ignore the codes, in which case nothing visible happens.
+Step 3. A part that fails prints its error and the next part still runs. An accepted `exit` stops the loop, and if the game ends part-way, the remaining parts are skipped with one message.
 
-#### The help command
+![Chain sequence diagram](images/ChainSequenceDiagram.png)
 
-`HelpCommand` groups commands by purpose (playing, saved games, player, other) and prints them through a small `printEntry` helper so the descriptions line up. It also explains chaining. The coordinate range is read from the `Board` passed to `execute`, so on a 16×30 board it shows "rows 1 to 16, columns 1 to 30" rather than the deprecated `Board.SIZE`. When a command is added or removed, its `printEntry` line must be updated too.
+The object diagram below shows both commands after they were parsed. `second` stores row 14 and column 28, which is valid only on the new board.
 
-#### Design decisions and alternatives
+![Chain object diagram](images/ChainObjectDiagram.png)
 
-| Decision | Alternative considered | Reason and trade-off |
-|---|---|---|
-| Draw mines in `printBoard` while the state is `LOST` | Set `isRevealed` on every mine when the game is lost | The display change cannot affect completion percentage, statistics or snapshots. The cost is that the rule lives in `Board.iconFor` rather than in `Cell`. |
-| Store safeclick in a separate `settings.txt` per profile | Add a column to `profiles.txt` | The registry stays strictly validated and its format unchanged. A second file per profile has to be read and written separately. |
-| Fall back to the default and never overwrite a bad settings file | Fail startup on a malformed file | A damaged setting should not stop the game, and the player's file is kept until they choose to change it. A typo in the file is silently ignored. |
-| Split chains in `Jaweeper`, parse each segment when it runs | Teach `Parser` to return a list of commands | Commands can change the board (`new`, `load`), so later segments must be validated against the updated board, and both `run` overloads get chaining. Parsing errors appear only when the segment is reached. |
-| Keep running after a failed command in a chain | Stop at the first error | The player sees every error and the valid commands still apply. A mistake early in a line does not cancel later commands that may depend on it. |
-| Skip the rest of a line when the game ends | Run every command and let each report "game over" | One note replaces a wall of repeated messages. The player cannot chain a `new` after a game-ending move on the same line. |
-| Share one `DeleteCommand.Confirmation` between delete commands | Store the pending name in `SaveTracker` or a static field | A command object lives for only one input line, so the state must be shared. A dedicated object keeps delete logic out of `SaveTracker` and avoids global state. |
-| `forgetSave` on delete | Leave the tracker unchanged | Otherwise `exit` would stay silent for a game whose save file no longer exists. One more method on `SaveTracker`. |
+> **Note:** `exit; exit` and `delete x; delete x` on one line count as confirmed repeats.
 
-#### Testing and known limitations
+#### Design considerations:
 
-The tests share setup (a temporary profile folder, captured output, a script runner) through the abstract class `SessionTestBase`:
+**Aspect: When each command is parsed**
 
-- `LossRevealTest` checks `*`, `X` and `F` after a loss, that cell state is unchanged, and that an in-progress board hides mines.
-- `SettingsCommandTest` covers safeclick on and off, persistence across a simulated restart, separate values per profile, invalid arguments and a malformed settings file.
-- `CommandChainingTest` covers `splitChain`, errors in the middle of a line, `exit`, parsing against a board changed by `new hard`, the game-ending skip and blank lines.
-- `SavesAndDeleteCommandTest` covers listing, the two-step delete, a different name needing a fresh confirmation, missing or invalid names, and the effect of deleting the current game's save on `exit`.
-- `ClearAndHelpCommandTest` covers the ANSI output and the help text. The `clear` test is currently `@Disabled`.
+* **Alternative 1 (current choice):** Parse each part just before it runs.
+  * Pros: Later parts are checked against the board as earlier parts left it.
+  * Cons: A parse error is only reported when that part is reached.
+* **Alternative 2:** Parse the whole line first.
+  * Pros: All syntax errors are reported before anything runs.
+  * Cons: `f 15 29` would be rejected against the old 9×9 board.
 
-**Known limitations:**
+### Deleting a saved game
 
-- `exit; exit` and `delete x; delete x` on a single line count as confirmed repeats, as described under command chaining.
-- `clear` depends on the terminal understanding ANSI codes, and is disabled for now.
-- Safeclick changes apply at the next first reveal, not to a game already in progress.
-- `UserGuide.md` does not yet describe these commands.
+`saves` lists the active profile's saved games, and `delete NAME`, typed twice, deletes one.
 
-## Product scope
-### Target user profile
+![Delete class diagram](images/DeleteClassDiagram.png)
 
-{Describe the target user profile}
+A command object lives for only one input line, so the remembered name is kept in a `DeleteCommand.Confirmation` object that `Jaweeper.createFeatureCommands` creates once and passes to every `delete` command.
 
-### Value proposition
+Given below is an example usage scenario.
 
-{Describe the value proposition: what problem does it solve?}
+Step 1. The player types `delete trip`. The save exists, so `confirmation.confirm("trip")` remembers the name and returns `false`, and a warning is printed.
 
-## User Stories
+Step 2. The player types `delete trip` again. The object diagram below shows the objects just before this second command executes.
 
-|Version| As a ... | I want to ... | So that I can ...|
-|--------|----------|---------------|------------------|
-|v1.0|new user|see usage instructions|refer to them when I forget how to use the application|
-|v2.0|user|find a to-do item by name|locate a to-do without having to go through the entire list|
+![Delete object diagram](images/DeleteObjectDiagram.png)
 
-## Non-Functional Requirements
+Step 3. `confirm("trip")` now returns `true`, and the file is deleted. Because `trip` was the current game's save, `forgetSave` makes the game count as unsaved again.
 
-{Give non-functional requirements}
+![Delete sequence diagram](images/DeleteSequenceDiagram.png)
 
-## Glossary
+> **Note:** If no save has that name, a message is printed and any pending confirmation is cleared. Deleting does not decode the file, so a corrupted save can still be deleted.
 
-* *glossary item* - Definition
+#### Design considerations:
 
-## Instructions for manual testing
+**Aspect: Where the pending confirmation is kept**
 
-{Give instructions on how to do a manual product testing e.g., how to load sample data to be used for testing}
+* **Alternative 1 (current choice):** One shared `DeleteCommand.Confirmation` object.
+  * Pros: Keeps delete logic out of `SaveTracker` and avoids global state.
+  * Cons: One more object to pass to each `delete` command.
+* **Alternative 2:** A static field in `DeleteCommand`.
+  * Pros: Nothing to pass around.
+  * Cons: Global state leaks between tests and between profiles.
+
+--------------------------------------------------------------------------------------------------------------------
+
+## Documentation, logging, testing, dev-ops
+
+* **Documentation:** The User Guide and this guide are in `docs/`. Diagram sources are in `docs/diagrams/` and the rendered images in `docs/images/`.
+* **Logging:** Classes use `java.util.logging`. Session start and end are logged at `INFO`, and command dispatch and rejected input at `FINE`. Full user input is not logged.
+* **Testing:** Run `./gradlew test`. Tests that touch files use JUnit temporary folders, so they never change real player data. Shared setup for session-based tests is in `SessionTestBase`.
+* **Dev-ops:** GitHub Actions (`.github/workflows/gradle.yml`) runs `./gradlew check` on every push and pull request. Checkstyle rules are in `config/checkstyle/`.
+
+--------------------------------------------------------------------------------------------------------------------
+
+## Appendix: Requirements
+
+### Product scope
+
+**Target user profile**:
+
+* plays short Minesweeper games in a terminal
+* prefers typing commands to using a mouse
+* is comfortable running a Java application
+* may share a computer with other players, one at a time
+
+**Value proposition**: play Minesweeper with selectable difficulty, named saves and per-player statistics, entirely from the keyboard.
+
+### User stories
+
+Priorities: High (must have) - `* * *`, Medium (nice to have) - `* *`, Low (unlikely to have) - `*`
+
+| Priority | As a …​ | I want to …​ | So that I can…​ |
+|---|---|---|---|
+| `* * *` | new player | view command help | learn the inputs and the coordinate range |
+| `* * *` | player | reveal, flag and unflag cells | solve a board with the keyboard |
+| `* * *` | returning player | create or choose a profile at launch | keep my saves and settings separate |
+| `* * *` | player | start an easy, medium or hard game | choose the challenge |
+| `* * *` | player | save and load an unfinished game | continue it later |
+| `* *` | player | start a custom-sized game | practise a particular board |
+| `* *` | player | list and delete saves | manage my stored games |
+| `* *` | player | undo my last move | recover from a mistyped coordinate |
+| `* *` | player | ask for a hint | get unstuck |
+| `* *` | player | view my statistics and a leaderboard | track my progress |
+| `* *` | player | turn safeclick on or off | choose how the first move behaves |
+| `* *` | player | manage profiles during play | switch players without relaunching |
+| `* *` | player | see all mines after I lose | learn from my mistakes |
+| `*` | experienced player | chain commands with `;` | make several moves at once |
+
+### Use cases
+
+(For all use cases below, the **System** is `Jaweeper` and the **Actor** is the `player`, unless specified otherwise)
+
+**Use case: UC01 - Start playing**
+
+**MSS**
+
+1. Player launches Jaweeper.
+1. Jaweeper lists the existing profiles.
+1. Player selects a profile.
+1. Jaweeper shows a new easy board.
+
+    Use case ends.
+
+**Extensions**
+
+* 2a. There are no profiles.
+    * 2a1. Player creates a profile.
+
+      Use case resumes at step 4.
+* 3a. The profile number is invalid.
+    * 3a1. Jaweeper shows an error message.
+
+      Use case resumes at step 2.
+
+**Use case: UC02 - Reveal a cell**
+
+**MSS**
+
+1. Player requests to reveal a cell.
+1. Jaweeper reveals the cell and its blank neighbours, and shows the board.
+
+    Use case ends.
+
+**Extensions**
+
+* 1a. The coordinates are invalid, or the cell is flagged.
+    * 1a1. Jaweeper shows an error message.
+
+      Use case ends.
+* 2a. The cell is a mine.
+    * 2a1. Jaweeper shows all mines, records a loss and ends the game.
+
+      Use case ends.
+* 2b. All safe cells are now revealed.
+    * 2b1. Jaweeper records a win and ends the game.
+
+      Use case ends.
+
+**Use case: UC03 - Save a game**
+
+**MSS**
+
+1. Player requests to save the game under a name.
+1. Jaweeper saves the game and confirms.
+
+    Use case ends.
+
+**Extensions**
+
+* 1a. The name is invalid.
+    * 1a1. Jaweeper shows an error message.
+
+      Use case ends.
+* 1b. The game is already finished.
+    * 1b1. Jaweeper says there is nothing to save.
+
+      Use case ends.
+* 2a. The file cannot be written.
+    * 2a1. Jaweeper shows an error message and the game stays unsaved.
+
+      Use case ends.
+
+**Use case: UC04 - Load a game**
+
+**MSS**
+
+1. Player requests to load a saved game.
+1. Jaweeper replaces the current game with the saved one and shows it.
+
+    Use case ends.
+
+**Extensions**
+
+* 1a. The save does not exist or is invalid.
+    * 1a1. Jaweeper shows an error message and keeps the current game.
+
+      Use case ends.
+* 1b. The current game has unsaved progress.
+    * 1b1. Jaweeper warns the player.
+    * 1b2. Player repeats the request.
+
+      Use case resumes at step 2.
+
+**Use case: UC05 - Switch profiles**
+
+**MSS**
+
+1. Player requests to list profiles.
+1. Jaweeper lists the profiles and marks the current one.
+1. Player selects another profile.
+1. Jaweeper switches to it and shows a new easy board.
+
+    Use case ends.
+
+**Extensions**
+
+* 3a. The current game has unsaved progress.
+    * 3a1. Jaweeper asks the player to save first (UC03).
+
+      Use case ends.
+
+**Use case: UC06 - Delete a saved game**
+
+**MSS**
+
+1. Player requests to list saved games.
+1. Jaweeper lists the saved games.
+1. Player requests to delete one.
+1. Jaweeper warns that deletion is permanent.
+1. Player repeats the request.
+1. Jaweeper deletes the save.
+
+    Use case ends.
+
+**Extensions**
+
+* 2a. There are no saved games.
+
+  Use case ends.
+* 3a. No save has that name.
+    * 3a1. Jaweeper shows an error message.
+
+      Use case resumes at step 2.
+
+### Non-Functional Requirements
+
+1. Should work on any _mainstream OS_ as long as it has Java 25 installed.
+1. Should be fully usable through text commands in a terminal; coordinates shown to the user are one-based.
+1. Should work offline; all data is stored in local UTF-8 text files.
+1. Invalid input should produce an explanatory message and never end the program, even with assertions disabled.
+1. Every data file should be validated before use, and a failed write should never be reported as a success.
+1. Renaming a profile should not move or lose its saved games or settings.
+1. A board up to 50×50 should respond to a command without noticeable delay.
+1. Only one instance of the app is expected to use a data folder at a time.
+
+### Glossary
+
+* **Mainstream OS**: Windows, Linux, Unix, MacOS
+* **Board / cell**: The rectangular minefield / one position in it
+* **Reveal**: Open a cell; a safe cell shows how many adjacent cells hold mines
+* **Flag**: Mark a cell the player believes holds a mine
+* **Flood fill**: Revealing connected blank cells and their numbered border
+* **Safeclick**: The setting that makes the first reveal of a game safe
+* **Profile**: A local player, identified by a stable UUID
+* **Command factory**: A function that validates arguments and constructs a command
+* **Unsaved progress**: Moves made since the last save or load of the current game
+
+--------------------------------------------------------------------------------------------------------------------
+
+## Appendix: Instructions for manual testing
+
+Given below are instructions to test the app manually.
+
+> **Note:** These instructions only provide a starting point for testers to work on; testers are expected to do more *exploratory* testing. Board generation is random, so check sizes, flags and messages rather than mine positions.
+
+### Launch and shutdown
+
+1. Initial launch
+
+   1. Copy the JAR into an empty folder and run `java -ea -jar jaweeper.jar` there.<br>
+      Expected: A profile prompt saying there are no profiles yet.
+
+   1. Test case: `create DG Tester`<br>
+      Expected: Profile selected and an empty 9×9 board shown.
+
+1. Profile persistence
+
+   1. Type `exit`, then relaunch from the same folder.<br>
+      Expected: `DG Tester` is listed.
+
+   1. Test case: `create dg tester`<br>
+      Expected: Rejected as a duplicate name.
+
+   1. Test case: `select 999`<br>
+      Expected: An invalid-selection message, and the prompt is shown again.
+
+### Playing a game
+
+1. Revealing and flagging with invalid input
+
+   1. Test case: `r 0 1`, `r 10 1`, `r abc 1`<br>
+      Expected: Each is rejected with an error message. No cell is revealed.
+
+1. Boards of different sizes
+
+   1. Test case: `new hard`<br>
+      Expected: A 16×30 board with `Remaining Mines: 99`.
+
+   1. Test case: `new custom 5 5 25`<br>
+      Expected: Rejected, because mines must be fewer than cells.
+
+   1. Test case: `new custom 5 6 3`<br>
+      Expected: A 5×6 board.
+
+1. Undo and hints
+
+   1. Test case: `f 1 1`, then `undo`<br>
+      Expected: The flag appears, then disappears.
+
+   1. Test case: `hint` on a fresh board<br>
+      Expected: `No safe cell can be deduced yet. Reveal more cells.`
+
+1. Chaining
+
+   1. Test case: `new easy; f 9 9; board`<br>
+      Expected: A 9×9 board with the bottom-right cell flagged.
+
+   1. Test case: `unknown; board`<br>
+      Expected: An error message, then the board.
+
+### Switching profiles
+
+1. Switching with unsaved progress
+
+   1. Prerequisites: `profile create Guest`, then `f 1 1`.
+
+   1. Test case: `profile select 2`<br>
+      Expected: A message asking the player to save first. The board is unchanged.
+
+   1. Test case: `save check`, then `profile select 2`<br>
+      Expected: Guest is active with a fresh board. `undo` reports nothing to undo.
+
+1. Deleting a profile
+
+   1. Test case: `profile delete 2 confirm` while Guest is active<br>
+      Expected: Rejected.
+
+   1. Test case: `profile select 1`, `profile delete 2`, then `profile delete 2 confirm`<br>
+      Expected: A warning, then Guest is removed.
+
+### Saving data
+
+1. Saving and loading
+
+   1. Test case: `new`, `f 1 1`, `save dg-check`<br>
+      Expected: `Game saved as 'dg-check'.`
+
+   1. Test case: `u 1 1`, `load dg-check`, then `load dg-check` again<br>
+      Expected: A warning first, then the saved board with the flag at row 1, column 1.
+
+   1. Test case: `load no-such-save`<br>
+      Expected: An error message. The current board is unchanged.
+
+1. Dealing with corrupted data files
+
+   1. Edit one board character in `data/profiles/<UUID>/saves/dg-check.txt`, then `load dg-check`.<br>
+      Expected: Rejected as changed outside Jaweeper or damaged. The current board is unchanged.
+
+   1. In a separate test folder, change the first line of `data/profiles.txt` to `invalid-header` and relaunch.<br>
+      Expected: An error about the profile registry. The file is not overwritten.
+
+1. Unsaved progress on exit
+
+   1. Test case: `u 1 1`, then `exit`<br>
+      Expected: A warning. A second `exit` closes the app.
+
+### Settings and saved games
+
+1. Safeclick
+
+   1. Test case: `settings safeclick off`, `exit`, relaunch with the same profile, `settings`<br>
+      Expected: Safeclick is shown as OFF.
+
+1. Listing and deleting saves
+
+   1. Test case: `saves`, then `delete dg-check` twice<br>
+      Expected: The save is listed, then a warning, then the save is deleted.

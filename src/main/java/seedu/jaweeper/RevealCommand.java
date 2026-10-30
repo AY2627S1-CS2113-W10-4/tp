@@ -38,6 +38,10 @@ public class RevealCommand extends Command {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before revealing";
 
+        // @@author ProNoob116
+        recordHistory(board);
+        // @@author
+
         LOGGER.log(Level.FINE, "Reveal requested at (" + row + ", " + col + ")");
 
         try {
@@ -139,4 +143,15 @@ public class RevealCommand extends Command {
             System.out.println("========================");
         }
     }
+
+    // @@author ProNoob116
+    /**
+     * Saves the board before this reveal command changes it.
+     */
+    private void recordHistory(Board board) {
+        if (session != null) {
+            session.pushBoardHistory(board);
+        }
+    }
+    // @@author
 }
