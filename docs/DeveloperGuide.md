@@ -225,7 +225,7 @@ the next profile that has inherited the same list number.
 
 ![Board class diagram](images/BoardClassDiagram.png)
 
-`Board` stores its own `rows`, `cols` and `totalMines`, so all board logic works for any size. `CustomGameCommand.validate` accepts dimensions from 5 to 50 and a mine count from 1 to cells − 1.
+`Board` stores its own `rows`, `cols` and `totalMines`, so all board logic works for any size. `CustomGameCommand.validate` accepts dimensions from 5 to 50 and a mine count from 1 to cells − 9.
 
 Given below is an example usage scenario of `new hard`.
 
@@ -266,7 +266,7 @@ Step 1. The player flags one cell. Before flagging, `FlagCommand` calls `session
 
 Step 2. The player flags a second cell. Another copy, now containing the first flag, is pushed.
 
-Step 3. The player types `undo`. `undoLastMove` pops the top copy and copies it onto the live board with `copyStateFrom`.
+Step 3. The player types `undo`. `undoLastMove` pops the top copy and copies it onto the live board with `Board.restoreFrom`.
 
 ![Undo sequence diagram](images/UndoSequenceDiagram.png)
 
@@ -274,7 +274,7 @@ The object diagram below shows the objects after Step 3. The second flag is gone
 
 ![Undo object diagram](images/UndoObjectDiagram.png)
 
-> **Note:** If the history is empty, `undo` prints `Nothing to undo.` `new custom` and switching profiles clear the history. A preset `new` currently does not, so `undo` straight after it brings back the last board of the previous game.
+> **Note:** If the history is empty, `undo` prints `Nothing to undo.` `new custom`, preset `new` commands, and switching profiles now clear the undo history.
 
 #### Design considerations:
 

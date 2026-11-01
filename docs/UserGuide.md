@@ -735,7 +735,7 @@ Usage: leaderboard
 
 **Q**: Can I undo after hitting a mine?
 
-**A**: Yes. `undo` takes back the reveal that hit the mine, so you can keep playing that game. The loss is still counted in your statistics.
+**A**: No. It is no longer possible to undo after hitting a mine, because winning or losing now clears the undo history.
 
 **Q**: How do I move my saved games to another computer?
 
