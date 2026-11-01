@@ -190,7 +190,14 @@ The object diagram below shows the objects after Step 3. Both profiles stay in t
 
 ![Profile object diagram](images/ProfileObjectDiagram.png)
 
-> **Note:** `profile create NAME` adds a profile without switching. `profile rename NUMBER NAME` keeps the UUID and the same `Stats` object. `profile delete NUMBER confirm` removes an inactive profile from the registry but keeps its files.
+> **Note:** `profile create NAME` adds a profile without switching. `profile rename NUMBER NAME` keeps the UUID and the same `Stats` object. Profile name arguments preserve internal spaces and use the same validation as startup.
+
+Inactive-profile deletion retains the profile's files. `profile delete NUMBER` first warns
+about the target. A session-scoped `ProfileDeletionConfirmation` stores its UUID, name and
+list number. `profile delete NUMBER confirm` removes it only if all three still match;
+otherwise it shows a new warning. The confirmation is consumed before writing the registry
+and cleared when switching players. Repeating a completed deletion therefore cannot delete
+the next profile that has inherited the same list number.
 
 #### Design considerations:
 

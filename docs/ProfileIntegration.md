@@ -1,4 +1,4 @@
-# Jaweeper v2.0 shared runtime contract
+# Jaweeper shared runtime contract
 
 This document describes the profile foundation and runtime wiring maintained by Zheng Yiting. Save/load, statistics, variable-size boards, settings and chained commands now use the shared session; their domain logic belongs to the corresponding feature owners.
 
@@ -27,12 +27,14 @@ Recommended independent locations:
 
 - Registry: `data/profiles.txt` -- Zheng Yiting.
 - Named saves: `session.getProfileDirectory().resolve("saves")` -- Yong Xiang.
-- Statistics: `session.getProfileDirectory().resolve("stats.txt")` -- proposed location for Matthew's future persistence; current statistics are in memory only.
+- Statistics: `session.getProfileDirectory().resolve("stats.txt")` -- owned by the statistics feature and persisted through `StatsStorage`.
 - Profile settings, if persisted: `session.getProfileDirectory().resolve("settings.txt")` -- ZW.
 
 Only the UUID is safe as a profile path component. Each feature must validate its own user-provided save names/paths and its own file contents. Renaming a profile must not rename its UUID directory.
 
-Inactive-profile deletion removes the registry record and retains feature files. Active-profile deletion is blocked. Recreating the same display name creates a new UUID and does not reconnect retained files. `profile delete NUMBER` explains this without deleting; `profile delete NUMBER confirm` confirms removal. Numbers refer to the current `profile list`. Runtime `profile create NAME` creates without switching; startup `create NAME` still selects the created profile.
+Inactive-profile deletion removes the registry record and retains feature files. Active-profile deletion is blocked. Recreating the same display name creates a new UUID and does not reconnect retained files. `profile delete NUMBER` explains this without deleting; `profile delete NUMBER confirm` removes only the previously warned target. Numbers refer to the current `profile list`. Runtime `profile create NAME` creates without switching; startup `create NAME` still selects the created profile.
+
+`Jaweeper.createFeatureCommands` shares one `ProfileDeletionConfirmation` across profile commands in a session and passes it as the fifth argument of `ProfileCommand.parse`. The warning records the target UUID, name and number. A mismatched or missing warning only prompts again, even if `confirm` was supplied. Acceptance consumes the warning before the file write; successful profile switching clears it. This state is separate from saved-game deletion confirmation.
 
 ## Command contract and registration
 
@@ -62,7 +64,7 @@ Reuse the existing tracker; do not create a tracker for each parsed command.
 - Factories must not perform gameplay or disk mutations; return a command to perform the operation in `execute`.
 - `execute` still cannot declare checked `IOException`. Catch file errors inside the feature command, report the failure, and do not report a successful save/load or update success flags afterward.
 - A cancelled exit must return false from `isExit()`. Return true only after exit was actually accepted.
-- The main loop splits semicolon-separated commands, then parses each segment immediately before execution. The parser splits on whitespace; quoting and escaping are not supported. The profile factory reconstructs a name from its remaining tokens using single spaces.
+- The main loop splits semicolon-separated commands, then parses each segment immediately before execution. Quoting and escaping are not supported. Most routes split arguments on whitespace. For `profile create` and `profile rename`, `ProfileCommand.splitArguments` retains the entire name as one argument, so internal spaces and invalid characters reach `Profile.validateName` unchanged, just as at startup.
 - EOF currently ends the game loop directly. An exit command override does not intercept EOF; coordinate any EOF warning policy separately.
 
 Zheng Yiting coordinates changes to the central registry and parser. Feature owners can test by passing their own feature map to:
