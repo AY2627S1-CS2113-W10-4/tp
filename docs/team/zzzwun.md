@@ -40,9 +40,6 @@ Given below are my contributions to the project.
 - **Project management**:
     - Tagged and published release `v2.0` on GitHub.
     - Managed milestones `v2.0` - `v2.1` on GitHub, ensuring PRs and Issues are correctly tagged
-- **Enhancements to existing features**:
-    - Added assertions and logging to `FlagCommand` and `UnflagCommand` (PR #32).
-    - Wrote 26 JUnit tests for the quality-of-life features (25 active, 1 disabled with `clear`), split into one test class per feature with shared setup in an abstract `SessionTestBase` class, to follow the existing one-class-per-feature test layout.
 - **Bug fixes** (PR #64): found by testing the integrated game, and covered by 20 regression tests in `LogicBugRegressionTest`.
     - **Custom boards and flood fill**: a custom board could be created with so many mines that the safe first click had no room to clear its 3×3 opening. The code that relocates mines then retried random positions and could loop forever. `new custom` now allows at most `ROWS × COLS − 9` mines, so the first reveal always opens a blank area for the flood fill to expand from, and mines are relocated by shuffling a list of free cells instead of retrying at random. I updated the User Guide and Developer Guide to state the new limit and error message.
     - **Statistics saved per profile**: statistics were lost when the game closed. Each profile's wins, losses, streaks and completion times are now written to `stats.txt` in its own folder after every win, loss and `stats clear`, and loaded at startup. The file reuses the existing `Storage` helper, which writes to a temporary file first, so a failed write keeps the previous file. A write error is reported without interrupting the game.
@@ -59,6 +56,11 @@ Given below are my contributions to the project.
         - Wins are recorded in milliseconds, which is the unit `Stats` stores, instead of seconds. Fastest times and the leaderboard now use one consistent unit.
     - **Leaderboard ordering**: the sort comparator was reversed twice, which undid the ordering on wins. It now ranks by most wins, then by higher win rate.
     - **Completion percentage after a loss**: the mine that ended the game counted as a revealed safe cell in the game summary. It no longer does, so "Safe Cells Revealed" is correct after a loss.
+- **Testing and code quality**:
+    - Wrote 58 JUnit tests: 12 for flag and unflag (`FlagUnflagCommandTest`), 26 for the quality-of-life features (25 active, 1 disabled together with `clear`), and 20 regression tests for the PR #64 bug fixes (`LogicBugRegressionTest`).
+    - Split the quality-of-life tests into one class per feature, with shared setup in an abstract `SessionTestBase` class, to follow the existing one-class-per-feature test layout.
+    - Tests that touch files use JUnit temporary folders and run commands through the real application loop, so they check what the player sees and what is written to disk, not only individual methods.
+    - Added assertions for internal invariants (for example, a flagged cell is never revealed) and logging at FINE, INFO and WARNING levels to `FlagCommand` and `UnflagCommand` (PR #32).
 - **Documentation**:
     - Team: filled in my entry on the About Us page (PR #2).
     - User Guide:
@@ -71,5 +73,4 @@ Given below are my contributions to the project.
     - Reviewed PRs of other teams, leaving feedback that some current implementations were not working correctly
     - Contributed to forum issues discussions
     - Reported bugs and suggestions for other teams in the class
-
 
