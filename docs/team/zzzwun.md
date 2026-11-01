@@ -40,7 +40,7 @@ Given below are my contributions to the project.
 - **Project management**:
     - Tagged and published release `v2.0` on GitHub.
     - Managed milestones `v2.0` - `v2.1` on GitHub, ensuring PRs and Issues are correctly tagged
-- **Bug fixes** (PR #64): found by testing the integrated game, and covered by 20 regression tests in `LogicBugRegressionTest`.
+- **Enhancements and Bug fixes** (PR #64): found by testing the integrated game, and covered by 20 regression tests in `LogicBugRegressionTest`.
     - **Custom boards and flood fill**: a custom board could be created with so many mines that the safe first click had no room to clear its 3×3 opening. The code that relocates mines then retried random positions and could loop forever. `new custom` now allows at most `ROWS × COLS − 9` mines, so the first reveal always opens a blank area for the flood fill to expand from, and mines are relocated by shuffling a list of free cells instead of retrying at random. I updated the User Guide and Developer Guide to state the new limit and error message.
     - **Statistics saved per profile**: statistics were lost when the game closed. Each profile's wins, losses, streaks and completion times are now written to `stats.txt` in its own folder after every win, loss and `stats clear`, and loaded at startup. The file reuses the existing `Storage` helper, which writes to a temporary file first, so a failed write keeps the previous file. A write error is reported without interrupting the game.
     - **Safeguards against hand-edited data files**: `stats.txt` is validated on load (header and line count, digits-only numbers with a length cap, and win, streak and completion-time counts that agree with each other). A damaged or edited file is ignored with a log warning and the profile starts from zero, instead of crashing or showing impossible statistics. The file is only replaced the next time a result is recorded. The first-click mine relocation also has a fallback for hand-made saves whose board is too dense: it clears only the clicked cell, rather than searching forever for free cells that do not exist.
@@ -69,6 +69,9 @@ Given below are my contributions to the project.
     - Developer Guide:
         - Added a "Gameplay quality-of-life features" section covering the design and implementation of each feature above, the alternatives considered, testing and known limitations.
         - Updated existing sections that the new features made out of date: command chaining, the built-in command list, and the planned `saves` and `delete` commands.
+        - The DeveloperGuide has been restructured and the sections are now ordered differently. For the restructured guide, these features are now documented in `Flagging a cell` (flag and unflag), `Showing all mines after a loss`, `Changing the safeclick setting`, `Chaining commands`, and `Deleting a saved game`
+        - It also covers the victory check and features I fixed bugs in, under `Recording a game result`, `Creating a board`, `Undoing a move`, `Getting a hint`, and `Viewing the leaderboard`.
+        - Updated the manual-testing steps for the relevant features as well.
 - **Community**:
     - Reviewed PRs of other teams, leaving feedback that some current implementations were not working correctly
     - Contributed to forum issues discussions
