@@ -5,12 +5,16 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Stack;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Shares the current board and profile manager across commands in one application.
  * Save formats, statistics and unsaved-game policies belong to their feature owners.
  */
 public final class GameSession {
+
+    private static final Logger LOGGER = Logger.getLogger(GameSession.class.getName());
 
     private final ProfileManager profileManager;
     private final GameTimer gameTimer;
@@ -60,6 +64,8 @@ public final class GameSession {
      */
     public void replaceBoard(Board replacement) {
         board = Objects.requireNonNull(replacement, "Replacement board must not be null");
+        // Undo must never step back into a different game.
+        boardHistory.clear();
     }
 
     /**
@@ -107,6 +113,24 @@ public final class GameSession {
         settingsProfileId = getActiveProfile().getId();
     }
 
+    /**
+     * Writes the active profile's statistics to disk so they survive a restart.
+     * A failed write is reported but does not interrupt the game. Does nothing when no
+     * profile is active (legacy/test usage).
+     */
+    public void saveStats() {
+        Optional<Profile> active = profileManager.getActiveProfile();
+        if (active.isEmpty()) {
+            return;
+        }
+        try {
+            StatsStorage.write(active.get().getStats(), getProfileDirectory());
+        } catch (IOException exception) {
+            LOGGER.log(Level.WARNING, "Could not save statistics", exception);
+            System.out.println("Could not save your statistics: " + exception.getMessage());
+        }
+    }
+
     // @@author ProNoob116
     /**
      * Saves an independent copy of the board before a reveal or flag changes it.
@@ -127,7 +151,8 @@ public final class GameSession {
             return false;
         }
         Board previous = boardHistory.pop();
-        current.copyStateFrom(previous);
+        // Restore in place so the grid keeps its identity and save tracking still applies.
+        current.restoreFrom(previous);
         this.board = current;
         return true;
     }

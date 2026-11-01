@@ -45,8 +45,9 @@ public class NewGameCommand extends Command {
         Board newBoard = new Board(difficulty.rows, difficulty.cols, difficulty.mines);
         board.copyStateFrom(newBoard);
 
-        // Start/reset the timer if session is present
+        // Start/reset the timer and forget the previous game's undo history
         if (session != null) {
+            session.clearBoardHistory();
             session.getGameTimer().start();
         }
 

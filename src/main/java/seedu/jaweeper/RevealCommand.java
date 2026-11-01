@@ -38,10 +38,6 @@ public class RevealCommand extends Command {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before revealing";
 
-        // @@author ProNoob116
-        recordHistory(board);
-        // @@author
-
         LOGGER.log(Level.FINE, "Reveal requested at (" + row + ", " + col + ")");
 
         try {
@@ -54,6 +50,13 @@ public class RevealCommand extends Command {
 
         Cell target = board.grid[row][col];
         assert target != null : "Cell in grid must not be null";
+
+        // @@author ProNoob116
+        // Only a reveal that changes the board gets an undo step; re-revealing a cell does not.
+        if (!target.isRevealed) {
+            recordHistory(board);
+        }
+        // @@author
 
         // Classic Minesweeper: the first reveal of a game is never a mine and opens a blank area.
         // The player can switch this off with 'settings safeclick off'.
@@ -98,6 +101,9 @@ public class RevealCommand extends Command {
                 session.getGameTimer().stop();
             }
             session.getActiveProfile().getStats().recordLoss();
+            session.saveStats();
+            // The loss is final: undoing it would let the same game also be won.
+            session.clearBoardHistory();
         }
 
         assert target.isRevealed : "Mine cell should be revealed after hitting it";
@@ -127,12 +133,16 @@ public class RevealCommand extends Command {
             board.setGameState(GameState.WON);
 
             if (session != null) {
-                long timeTakenInSeconds = 0;
+                long timeTakenInMillis = 0;
                 if (session.getGameTimer() != null) {
                     session.getGameTimer().stop();
-                    timeTakenInSeconds = session.getGameTimer().getElapsedTimeSeconds();
+                    timeTakenInMillis = session.getGameTimer().getElapsedMillis();
                 }
-                session.getActiveProfile().getStats().recordWin(timeTakenInSeconds);
+                // Stats stores completion times in milliseconds.
+                session.getActiveProfile().getStats().recordWin(timeTakenInMillis);
+                session.saveStats();
+                // The win is final: undoing it would let the same game be won again.
+                session.clearBoardHistory();
             }
 
             assert board.getGameState() == GameState.WON : "Game should be won after victory";

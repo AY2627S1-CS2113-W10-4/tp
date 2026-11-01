@@ -41,10 +41,6 @@ public class UnflagCommand extends Command {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before unflagging";
 
-        // @@author ProNoob116
-        recordHistory(board);
-        // @@author
-
         logger.log(Level.FINE, "Unflag requested at (" + row + ", " + col + ")");
 
         if (board.isGameOver()) {
@@ -68,6 +64,9 @@ public class UnflagCommand extends Command {
             logger.log(Level.INFO, "Unflag rejected: cell (" + row + ", " + col + ") is not flagged");
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is not flagged.");
         } else {
+            // @@author ProNoob116
+            recordHistory(board);
+            // @@author
             target.isFlagged = false;
             assert !target.isFlagged : "Cell should not be flagged after unflagging";
             logger.log(Level.INFO, "Cell unflagged at (" + row + ", " + col + ")");

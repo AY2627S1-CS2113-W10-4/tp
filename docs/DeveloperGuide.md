@@ -840,7 +840,7 @@ Given below are instructions to test the app manually.
       Expected: A 16×30 board with `Remaining Mines: 99`.
 
    1. Test case: `new custom 5 5 25`<br>
-      Expected: Rejected, because mines must be fewer than cells.
+      Expected: Rejected, because a 5×5 board allows at most 16 mines (9 cells must stay free for the safe first click).
 
    1. Test case: `new custom 5 6 3`<br>
       Expected: A 5×6 board.

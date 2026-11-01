@@ -7,7 +7,7 @@
 Given below are my contributions to the project.
 
 * **New Feature**: Added custom games (`new custom ROWS COLS MINES`).
-    * What it does: starts a board of the size and mine count the player chooses. Each side must be a whole number from 5 to 50, and the mine count must be at least 1 and strictly fewer than the number of cells. The previous board is discarded and the undo history is cleared.
+    * What it does: starts a board of the size and mine count the player chooses. Each side must be a whole number from 5 to 50, and the mine count must be at least 1 and leave at least 9 cells free, so the first reveal can open a clear 3×3 area. The previous board is discarded and the undo history is cleared.
     * Justification: the three presets are not enough when a player wants a short practice board or a larger one. Rejecting illegal sizes before a board is built keeps a bad command from changing the game in progress.
     * Highlights: `CustomGameCommand` is reached from the existing `new` factory before the preset check, so `new easy`, `new medium`, `new hard` and `new custom` stay one command. Validation runs before `rows * cols` is used as a mine limit. `CustomGameCommandTest` covers negative and zero sizes, the 4 and 51 boundaries, too many mines, non-integers, and a valid 5×5, 10×12 and 50×50 board.
     * Credits: none. The size limits follow the usual Minesweeper custom-board idea.
@@ -45,7 +45,7 @@ Starts a new game with the number of rows, columns and mines you choose. The pre
 Format: `new custom ROWS COLS MINES`
 
 * `ROWS` and `COLS` must be whole numbers from 5 to 50.
-* `MINES` must be at least 1 and fewer than `ROWS` × `COLS`.
+* `MINES` must be at least 1 and at most `ROWS` × `COLS` − 9, so the first reveal can always open a clear 3×3 area.
 
 Example:
 
@@ -72,7 +72,7 @@ Custom boards must be at least 5 by 5.
 Custom boards cannot exceed 50 by 50.
 
 > new custom 5 5 25
-Mines must be fewer than the number of cells.
+A 5x5 board allows at most 16 mines, so the first reveal can open a clear 3x3 area.
 
 > new custom 5 5 0
 A custom board needs at least 1 mine.

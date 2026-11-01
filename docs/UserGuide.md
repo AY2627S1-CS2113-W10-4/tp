@@ -310,7 +310,7 @@ Starts a new game with the number of rows, columns and mines you choose. The pre
 Format: `new custom ROWS COLS MINES`
 
 * `ROWS` and `COLS` must be whole numbers from 5 to 50.
-* `MINES` must be at least 1 and fewer than `ROWS` × `COLS`.
+* `MINES` must be at least 1 and at most `ROWS` × `COLS` − 9, so the first reveal can always open a clear 3×3 area.
 
 Example:
 
@@ -337,7 +337,7 @@ Custom boards must be at least 5 by 5.
 Custom boards cannot exceed 50 by 50.
 
 > new custom 5 5 25
-Mines must be fewer than the number of cells.
+A 5x5 board allows at most 16 mines, so the first reveal can open a clear 3x3 area.
 
 > new custom 5 5 0
 A custom board needs at least 1 mine.

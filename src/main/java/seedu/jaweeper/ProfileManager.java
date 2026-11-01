@@ -171,6 +171,9 @@ public class ProfileManager {
                         throw new IllegalArgumentException("Duplicate profile name.");
                     }
                 }
+                // Statistics live in each profile's own folder, next to its saves and settings.
+                StatsStorage.readInto(profile.getStats(),
+                        dataDirectory.resolve("profiles").resolve(profile.getId()));
                 loaded.put(profile.getId(), profile);
             } catch (IllegalArgumentException exception) {
                 throw new IOException("Invalid profiles.txt line " + (index + 1)

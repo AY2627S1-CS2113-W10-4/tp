@@ -29,8 +29,11 @@ public class LeaderboardCommand extends Command {
         // Wrap in ArrayList to make the list mutable for sorting
         List<Profile> profiles = new ArrayList<>(session.getProfileManager().getProfiles());
 
-        profiles.sort(Comparator.comparingInt((Profile p) -> p.getStats().getWins()).reversed()
-                .thenComparingDouble(p -> p.getStats().getWinRate()).reversed());
+        // Most wins first, then the higher win rate. A single reversed() covers both keys;
+        // reversing twice would undo the ordering on wins.
+        profiles.sort(Comparator.comparingInt((Profile p) -> p.getStats().getWins())
+                .thenComparingDouble(p -> p.getStats().getWinRate())
+                .reversed());
 
         System.out.println("================ LEADERBOARD ================");
         System.out.printf("%-4s | %-15s | %-6s | %-6s | %-8s\n", "Rank", "Profile", "Wins", "Losses", "Win Rate");

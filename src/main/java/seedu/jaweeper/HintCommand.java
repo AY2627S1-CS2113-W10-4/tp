@@ -5,7 +5,8 @@ import java.util.logging.Logger;
 
 // @@author ProNoob116
 /**
- * Suggests one hidden cell that is safe given the revealed numbers and flags.
+ * Suggests one hidden cell that the revealed numbers prove is safe. Flags are ignored,
+ * so a wrongly placed flag cannot lead the hint onto a mine.
  * The suggestion is printed and the board is left unchanged.
  */
 public class HintCommand extends Command {
@@ -69,18 +70,26 @@ public class HintCommand extends Command {
         System.out.println("Try revealing cell (" + (row + 1) + ", " + (column + 1) + ").");
     }
 
+    /**
+     * Finds a hidden, unflagged cell that the revealed numbers prove is safe.
+     * The player's flags are not trusted, because a wrong flag would make a mine look safe.
+     * Instead, a hidden cell is a known mine when some number's hidden neighbours are exactly
+     * as many as that number; a number already touching that many known mines makes its other
+     * hidden neighbours safe.
+     */
     private int[] findSafeCell(Board board) {
         requireRectangularGrid(board);
+        boolean[][] knownMines = findKnownMines(board);
         for (int row = 0; row < board.getRows(); row++) {
             for (int column = 0; column < board.getCols(); column++) {
                 Cell cell = board.grid[row][column];
                 if (!cell.isRevealed || cell.isMine) {
                     continue;
                 }
-                if (countFlaggedNeighbors(board, row, column) != cell.adjacentMines) {
+                if (countKnownMineNeighbors(board, knownMines, row, column) != cell.adjacentMines) {
                     continue;
                 }
-                int[] candidate = firstSafeNeighbor(board, row, column);
+                int[] candidate = firstSafeNeighbor(board, knownMines, row, column);
                 if (candidate != null) {
                     return candidate;
                 }
@@ -89,7 +98,33 @@ public class HintCommand extends Command {
         return null;
     }
 
-    private int[] firstSafeNeighbor(Board board, int row, int column) {
+    private boolean[][] findKnownMines(Board board) {
+        boolean[][] knownMines = new boolean[board.getRows()][board.getCols()];
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int column = 0; column < board.getCols(); column++) {
+                Cell cell = board.grid[row][column];
+                if (!cell.isRevealed || cell.isMine || cell.adjacentMines == 0) {
+                    continue;
+                }
+                if (countHiddenNeighbors(board, row, column) != cell.adjacentMines) {
+                    continue;
+                }
+                for (int rowOffset = -1; rowOffset <= 1; rowOffset++) {
+                    for (int columnOffset = -1; columnOffset <= 1; columnOffset++) {
+                        int neighborRow = row + rowOffset;
+                        int neighborColumn = column + columnOffset;
+                        if (isInside(board, neighborRow, neighborColumn)
+                                && !board.grid[neighborRow][neighborColumn].isRevealed) {
+                            knownMines[neighborRow][neighborColumn] = true;
+                        }
+                    }
+                }
+            }
+        }
+        return knownMines;
+    }
+
+    private int[] firstSafeNeighbor(Board board, boolean[][] knownMines, int row, int column) {
         for (int rowOffset = -1; rowOffset <= 1; rowOffset++) {
             for (int columnOffset = -1; columnOffset <= 1; columnOffset++) {
                 if (rowOffset == 0 && columnOffset == 0) {
@@ -101,7 +136,7 @@ public class HintCommand extends Command {
                     continue;
                 }
                 Cell neighbor = board.grid[neighborRow][neighborColumn];
-                if (!neighbor.isRevealed && !neighbor.isFlagged) {
+                if (!neighbor.isRevealed && !neighbor.isFlagged && !knownMines[neighborRow][neighborColumn]) {
                     return new int[]{neighborRow, neighborColumn};
                 }
             }
@@ -109,23 +144,35 @@ public class HintCommand extends Command {
         return null;
     }
 
-    private int countFlaggedNeighbors(Board board, int row, int column) {
-        int flagged = 0;
+    private int countKnownMineNeighbors(Board board, boolean[][] knownMines, int row, int column) {
+        int count = 0;
         for (int rowOffset = -1; rowOffset <= 1; rowOffset++) {
             for (int columnOffset = -1; columnOffset <= 1; columnOffset++) {
-                if (rowOffset == 0 && columnOffset == 0) {
-                    continue;
-                }
                 int neighborRow = row + rowOffset;
                 int neighborColumn = column + columnOffset;
-                if (isInside(board, neighborRow, neighborColumn)
-                        && board.grid[neighborRow][neighborColumn].isFlagged) {
-                    flagged++;
+                if ((rowOffset != 0 || columnOffset != 0) && isInside(board, neighborRow, neighborColumn)
+                        && knownMines[neighborRow][neighborColumn]) {
+                    count++;
                 }
             }
         }
-        assert flagged >= 0 && flagged <= 8 : "A cell has at most eight flagged neighbors";
-        return flagged;
+        assert count >= 0 && count <= 8 : "A cell has at most eight neighbors";
+        return count;
+    }
+
+    private int countHiddenNeighbors(Board board, int row, int column) {
+        int hidden = 0;
+        for (int rowOffset = -1; rowOffset <= 1; rowOffset++) {
+            for (int columnOffset = -1; columnOffset <= 1; columnOffset++) {
+                int neighborRow = row + rowOffset;
+                int neighborColumn = column + columnOffset;
+                if ((rowOffset != 0 || columnOffset != 0) && isInside(board, neighborRow, neighborColumn)
+                        && !board.grid[neighborRow][neighborColumn].isRevealed) {
+                    hidden++;
+                }
+            }
+        }
+        return hidden;
     }
 
     private boolean isInside(Board board, int row, int column) {

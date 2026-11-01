@@ -59,6 +59,18 @@ public class Stats {
         completionTimes.clear();
     }
 
+    /**
+     * Replaces every counter with previously saved values. Used only when loading from disk.
+     */
+    void restore(int wins, int losses, int currentStreak, int maxStreak, List<Long> completionTimes) {
+        this.wins = wins;
+        this.losses = losses;
+        this.currentStreak = currentStreak;
+        this.maxStreak = maxStreak;
+        this.completionTimes.clear();
+        this.completionTimes.addAll(completionTimes);
+    }
+
     public int getWins() {
         return wins;
     }
