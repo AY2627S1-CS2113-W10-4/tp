@@ -126,7 +126,9 @@ public class Jaweeper {
         // One shared confirmation, so the second 'delete NAME' is recognised as a repeat.
         DeleteCommand.Confirmation deleteConfirmation = new DeleteCommand.Confirmation();
         commands.put("delete", args -> DeleteCommand.parse(args, session, saveTracker, deleteConfirmation));
-        commands.put("profile", args -> ProfileCommand.parse(args, session, saveTracker, deleteConfirmation));
+        ProfileDeletionConfirmation profileDeletion = new ProfileDeletionConfirmation();
+        commands.put("profile", args -> ProfileCommand.parse(args, session, saveTracker,
+                deleteConfirmation, profileDeletion));
 
         commands.put("exit", args -> {
             if (args.length != 0) {

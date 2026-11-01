@@ -71,6 +71,15 @@ public class Board {
     }
 
     
+    // @@author ProNoob116
+    /**
+     * Builds an exact copy of {@code source} without generating a random board first.
+     */
+    private Board(Board source) {
+        copyStateFrom(source);
+    }
+    // @@author
+
     static Board restore(int rows, int cols, int totalMines, Cell[][] cells) {
         assert cells != null && cells.length == rows : "Row count must match the saved grid";
         assert rows > 0 && cols > 0 && cells[0].length == cols : "Column count must match the saved grid";
@@ -252,12 +261,6 @@ public class Board {
         return new Board(this);
     }
 
-    /**
-     * Builds an exact copy of {@code source} without generating a random board first.
-     */
-    private Board(Board source) {
-        copyStateFrom(source);
-    }
     // @@author
 
     private void calculateAdjacencies() {

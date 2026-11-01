@@ -40,11 +40,14 @@ At the game prompt `>`, use these commands:
 | `profile select NUMBER` | `profile select 2` | Switches to that player and starts a fresh easy game. |
 | `profile rename NUMBER NAME` | `profile rename 2 Guest New` | Changes the name while keeping the player's identity, saves, settings and current statistics. |
 | `profile delete NUMBER` | `profile delete 2` | Shows a warning; nothing is deleted yet. |
-| `profile delete NUMBER confirm` | `profile delete 2 confirm` | Removes that inactive profile from the list. |
+| `profile delete NUMBER confirm` | `profile delete 2 confirm` | Removes the inactive profile shown in the preceding deletion warning. Without a matching warning, only shows a warning. |
 
 Numbers refer to the current `profile list`, starting at 1. Deleting an entry renumbers
 later entries, so check the list again before selecting, renaming or confirming deletion.
 Names can include spaces without quotes; the same name restrictions as startup apply.
+Leading/trailing whitespace is removed, but spaces inside a name are preserved and
+count towards the 30-character limit. For example, `Alex  Lee` (two spaces) stays
+the same at startup and during play. Tabs inside a name are invalid.
 Command/action words ignore case. Missing arguments, invalid numbers and duplicate names
 are rejected without changing profiles.
 
@@ -72,8 +75,12 @@ for Guest. The final load restores Zheng Yiting's saved flag at row 1, column 1.
 
 You cannot delete the active profile; select another first. Deletion removes the registry
 entry but retains its data files. Recreating the same name creates a new identity and
-does **not** recover those files. Statistics survive renaming/switching in the current
-run but are not persisted across application restarts.
+does **not** recover those files.
+
+Deletion confirmation applies once to the warned profile's identity, name and list number.
+If that target changes, the command warns again instead of deleting it. Switching to
+another player clears the pending warning. After a successful deletion or a failed file
+write, a further `confirm` command must show a fresh warning before it can delete anything.
 
 ### Viewing help and the board
 

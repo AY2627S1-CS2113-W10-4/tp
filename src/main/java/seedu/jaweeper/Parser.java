@@ -36,7 +36,13 @@ public class Parser {
 
         Function<String[], Command> factory = featureCommands.get(name);
         if (factory != null) {
-            Command command = factory.apply(Arrays.copyOfRange(words, 1, words.length));
+            String[] arguments = Arrays.copyOfRange(words, 1, words.length);
+            if (name.equals("profile")) {
+                String[] commandAndArguments = input.strip().split("\\s+", 2);
+                arguments = ProfileCommand.splitArguments(
+                        commandAndArguments.length == 2 ? commandAndArguments[1] : "");
+            }
+            Command command = factory.apply(arguments);
             assert command != null : "Registered feature factory must not return null";
             return command;
         }

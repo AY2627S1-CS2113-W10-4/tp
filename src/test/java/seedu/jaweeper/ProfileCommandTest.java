@@ -156,7 +156,8 @@ public class ProfileCommandTest {
         session.setSafeClickEnabled(false);
         tracker.markSaved(session.getBoard(), "old-save");
         confirmation.confirm("same-name");
-        ProfileCommand.parse(new String[]{"select", "2"}, session, tracker, confirmation)
+        ProfileCommand.parse(new String[]{"select", "2"}, session, tracker, confirmation,
+                new ProfileDeletionConfirmation())
                 .execute(session.getBoard());
         assertFalse(session.undoLastMove(session.getBoard()));
         assertTrue(session.getGameTimer().getElapsedMillis() < 50000);
@@ -214,6 +215,7 @@ public class ProfileCommandTest {
         Files.writeString(registry.resolve("block.txt"), "keep");
         execute("profile create Third");
         execute("profile rename 1 Changed");
+        execute("profile delete 2");
         execute("profile delete 2 confirm");
         assertEquals(2, manager.getProfiles().size());
         assertSame(original, session.getActiveProfile());
@@ -228,7 +230,7 @@ public class ProfileCommandTest {
     @Test
     public void run_chainedProfileCommands_resolveCurrentListAndContinueAfterErrors() {
         try (Scanner input = new Scanner("profile create Third; profile rename 3 Third New; "
-                + "profile select 3; profile delete 1 confirm; profile select 2; "
+                + "profile select 3; profile delete 1; profile delete 1 confirm; profile select 2; "
                 + "profile select 99; profile list; help\nexit\n")) {
             Jaweeper.run(input, session, Jaweeper.createCoordinateCommands(session), features);
         }

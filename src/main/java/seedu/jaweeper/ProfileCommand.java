@@ -20,16 +20,19 @@ public final class ProfileCommand extends Command {
     private final GameSession session;
     private final SaveTracker tracker;
     private final DeleteCommand.Confirmation deleteConfirmation;
+    private final ProfileDeletionConfirmation profileDeletion;
     private final String action;
     private final int number;
     private final String name;
     private final boolean confirmed;
 
     private ProfileCommand(GameSession session, SaveTracker tracker, DeleteCommand.Confirmation deleteConfirmation,
-                           String action, int number, String name, boolean confirmed) {
+                           ProfileDeletionConfirmation profileDeletion, String action,
+                           int number, String name, boolean confirmed) {
         this.session = session;
         this.tracker = tracker;
         this.deleteConfirmation = deleteConfirmation;
+        this.profileDeletion = profileDeletion;
         this.action = action;
         this.number = number;
         this.name = name;
@@ -41,7 +44,8 @@ public final class ProfileCommand extends Command {
      * Names use the remaining tokens so display names can contain spaces.
      */
     public static ProfileCommand parse(String[] arguments, GameSession session, SaveTracker tracker,
-                                       DeleteCommand.Confirmation deleteConfirmation) {
+                                       DeleteCommand.Confirmation deleteConfirmation,
+                                       ProfileDeletionConfirmation profileDeletion) {
         if (arguments.length == 0) {
             throw new IllegalArgumentException(USAGE);
         }
@@ -77,7 +81,28 @@ public final class ProfileCommand extends Command {
         default:
             throw new IllegalArgumentException(USAGE);
         }
-        return new ProfileCommand(session, tracker, deleteConfirmation, action, number, name, confirmed);
+        return new ProfileCommand(session, tracker, deleteConfirmation, profileDeletion,
+                action, number, name, confirmed);
+    }
+
+    /**
+     * Splits the arguments after "profile", retaining a create/rename name as one argument.
+     * Only syntax separators are consumed: internal name spaces and invalid characters
+     * must reach the same validator used at startup without being rewritten by the parser.
+     */
+    static String[] splitArguments(String input) {
+        String trimmed = input.strip();
+        if (trimmed.isEmpty()) {
+            return new String[0];
+        }
+        String action = trimmed.split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+        if (action.equals("create")) {
+            return trimmed.split("\\s+", 2);
+        }
+        if (action.equals("rename")) {
+            return trimmed.split("\\s+", 3);
+        }
+        return trimmed.split("\\s+");
     }
 
     @Override
@@ -134,6 +159,7 @@ public final class ProfileCommand extends Command {
         session.getGameTimer().start();
         tracker.reset();
         deleteConfirmation.clear();
+        profileDeletion.clear();
         System.out.println("Selected profile: " + target.getName() + ". Started a fresh easy game.");
         fresh.printBoard();
     }
@@ -144,12 +170,13 @@ public final class ProfileCommand extends Command {
      */
     private void deleteProfile(ProfileManager manager, Profile target) throws IOException {
         if (target.getId().equals(session.getActiveProfile().getId())) {
+            profileDeletion.clear();
             throw new IllegalArgumentException("Select another profile before deleting the active profile.");
         }
-        if (!confirmed) {
+        if (!profileDeletion.confirm(target, number, confirmed)) {
             System.out.println("Remove profile '" + target.getName() + "' from the list? Data files will be retained.");
             System.out.println("Type 'profile delete " + number + " confirm' to confirm."
-                    + " Check 'profile list' again if profiles have changed.");
+                    + " A changed target requires a new confirmation.");
             return;
         }
         manager.deleteProfile(target.getId());
