@@ -2,7 +2,7 @@
 
 ### Project: Jaweeper
 
-Jaweeper is a command-line Minesweeper game written in Java, with about 3 kLoC of production code. Players type commands to reveal and flag cells, choose a difficulty, keep per-player profiles with statistics and a leaderboard, and save and resume games.
+Jaweeper is a command-line Minesweeper game written in Java, with about 11 kLoC of production code. Players interact and type commands via a CLI to reveal and flag cells, choose a difficulty, keep per-player profiles with statistics and a leaderboard, and save and resume games.
 
 Given below are my contributions to the project.
 
@@ -16,7 +16,7 @@ Given below are my contributions to the project.
     - Justification: this is the condition that ends a successful game. Flags are deliberately not part of it, so a player is never blocked from winning by a wrongly placed flag, matching classic Minesweeper.
     - Highlights: the check is wired into `RevealCommand` so it runs after the flood-fill that reveals empty regions, which can uncover many cells at once. My teammates later built the win/lose game state, timer and statistics on top of it, and adapted it to rectangular boards for the difficulty levels.
     - Credits: none.
-- **New Feature**: Added a batch of gameplay quality-of-life features
+- **New Feature**: Added a batch of gameplay quality-of-life features (PR #44).
     - **Mines revealed on loss**
         - What it does: after the player hits a mine, the board is printed with every unflagged mine shown as `*` and every wrongly placed flag shown as `X`; correct flags stay `F`.
         - Justification: showing what was missed lets the player learn from the loss.
@@ -39,12 +39,22 @@ Given below are my contributions to the project.
 - **Code contributed**: [RepoSense link](https://nus-cs2113-ay2627-s1.github.io/tp-dashboard/#/widget/?search=&sort=groupTitle&sortWithin=title&timeframe=commit&mergegroup=&groupSelect=groupByRepos&breakdown=true&checkedFileTypes=docs~functional-code~test-code~other&since=2026-09-18T00%3A00%3A00&filteredFileName=&chartGroupIndex=11&chartIndex=2)
 - **Project management**:
     - Tagged and published release `v2.0` on GitHub.
+    - Managed milestones `v2.0` - `v2.1` on GitHub, ensuring PRs and Issues are correctly tagged
 - **Enhancements to existing features**:
     - Added assertions and logging to `FlagCommand` and `UnflagCommand` (PR #32).
     - Wrote 26 JUnit tests for the quality-of-life features (25 active, 1 disabled with `clear`), split into one test class per feature with shared setup in an abstract `SessionTestBase` class, to follow the existing one-class-per-feature test layout.
 - **Documentation**:
     - Team: filled in my entry on the About Us page (PR #2).
+    - User Guide:
+        - Added documentation for the features `flagging a cell`, `removing a flag`, `seeing the mines after a loss`, `Changing settings`, `Running several commands at once`, `Listing saved games`, `Deleting a saved game` (PR #60)
+        - Also added more to `FAQ` portion with relation to this features, along with adding them to the `Command Summary` (PR #60)
     - Developer Guide:
         - Added a "Gameplay quality-of-life features" section covering the design and implementation of each feature above, the alternatives considered, testing and known limitations.
         - Updated existing sections that the new features made out of date: command chaining, the built-in command list, and the planned `saves` and `delete` commands.
-- **Pull requests merged**: #2 (About Us), #15 (flag), #19 (unflag and JUnit tests), #22 (victory check), #32 (assertions and logging for flag/unflag), #44 (quality-of-life features).
+- **Community**:
+    - Reviewed PRs of other teams, leaving feedback that some current implementations were not working correctly
+    - Contributed to forum issues discussions
+    - Reported bugs and suggestions for other teams in the class
+
+
+
