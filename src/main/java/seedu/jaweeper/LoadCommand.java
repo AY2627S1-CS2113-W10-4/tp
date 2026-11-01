@@ -56,6 +56,8 @@ public class LoadCommand extends Command {
         }
 
         session.replaceBoard(saved.board());
+        session.forgetLinkedSaves();
+        session.linkSave(name);
         session.getGameTimer().resumeFrom(saved.elapsedMillis());
         tracker.markSaved(saved.board(), name);
         LOGGER.log(Level.INFO, "Loaded save {0}", name);

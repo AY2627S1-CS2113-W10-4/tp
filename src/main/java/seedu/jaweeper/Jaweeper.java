@@ -11,6 +11,8 @@ import java.util.Scanner;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,6 +29,7 @@ public class Jaweeper {
      * @param args Command-line arguments, currently unused.
      */
     public static void main(String[] args) {
+        removeConsoleLogging();
         try (Scanner input = new Scanner(System.in)) {
             ProfileManager profiles = new ProfileManager(Path.of("data"));
             if (!ProfileStartup.selectProfile(input, profiles)) {
@@ -40,6 +43,20 @@ public class Jaweeper {
             LOGGER.log(Level.WARNING, "Could not load the profile registry", exception);
             System.out.println("Unable to open profiles: " + exception.getMessage());
             System.out.println("Check data/profiles.txt. No replacement registry has been created.");
+        }
+    }
+
+    /**
+     * Stops log records from being printed between game messages. Java's default setup sends
+     * INFO and above to the console, which mixed lines like "INFO: Cell flagged at (0, 0)"
+     * into the game output. Loggers still exist, so a handler can be added for debugging.
+     */
+    static void removeConsoleLogging() {
+        Logger root = Logger.getLogger("");
+        for (Handler handler : root.getHandlers()) {
+            if (handler instanceof ConsoleHandler) {
+                root.removeHandler(handler);
+            }
         }
     }
 

@@ -2,8 +2,10 @@ package seedu.jaweeper;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,6 +24,8 @@ public final class GameSession {
     // @@author ProNoob116
     private final Stack<Board> boardHistory = new Stack<>();
     // @@author
+    /** Saves written or loaded for the game in progress; removed once that game ends. */
+    private final Set<String> linkedSaves = new LinkedHashSet<>();
     /** Cached safeclick value, valid for {@link #settingsProfileId} only. */
     private boolean safeClickEnabled = ProfileSettings.DEFAULT_SAFE_CLICK;
     private String settingsProfileId;
@@ -111,6 +115,51 @@ public final class GameSession {
         ProfileSettings.writeSafeClick(getProfileDirectory(), enabled);
         safeClickEnabled = enabled;
         settingsProfileId = getActiveProfile().getId();
+    }
+
+    /**
+     * Records that save {@code name} holds a position of the current game.
+     */
+    public void linkSave(String name) {
+        linkedSaves.add(name);
+    }
+
+    /**
+     * Forgets save {@code name}, for example after the player deleted it.
+     */
+    public void unlinkSave(String name) {
+        linkedSaves.remove(name);
+    }
+
+    /**
+     * Forgets every save link. Called when another game replaces the current one; the files stay.
+     */
+    public void forgetLinkedSaves() {
+        linkedSaves.clear();
+    }
+
+    /**
+     * Deletes the saves of a game that has just been won or lost. A finished game's result is
+     * already in the statistics, so reloading one of its saves would let the same game be won
+     * (or retried) again.
+     */
+    public void deleteFinishedGameSaves() {
+        if (linkedSaves.isEmpty() || profileManager.getActiveProfile().isEmpty()) {
+            linkedSaves.clear();
+            return;
+        }
+        SaveStore store = SaveStore.forSession(this);
+        for (String name : linkedSaves) {
+            try {
+                if (store.delete(name)) {
+                    System.out.println("Removed save '" + name + "' because this game is finished.");
+                }
+            } catch (IOException exception) {
+                LOGGER.log(Level.WARNING, "Could not delete a finished game's save", exception);
+                System.out.println("Could not remove save '" + name + "': " + exception.getMessage());
+            }
+        }
+        linkedSaves.clear();
     }
 
     /**

@@ -58,6 +58,15 @@ public class SaveStore {
     }
 
     /**
+     * Returns the save file's exact contents, so a confirmation can be tied to one version of it.
+     *
+     * @throws IOException If the save cannot be read.
+     */
+    public byte[] readBytes(String name) throws IOException {
+        return Files.readAllBytes(pathFor(name));
+    }
+
+    /**
      * Writes a game, replacing any existing save with the same name.
      *
      * @throws IOException If the file cannot be written; the previous save, if any, is kept.
