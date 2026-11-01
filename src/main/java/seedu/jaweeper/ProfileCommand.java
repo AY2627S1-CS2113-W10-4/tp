@@ -129,6 +129,7 @@ public final class ProfileCommand extends Command {
         manager.selectProfile(target.getId());
         session.replaceBoard(fresh);
         session.clearBoardHistory();
+        session.forgetLinkedSaves();
         session.getGameTimer().reset();
         session.getGameTimer().start();
         tracker.reset();

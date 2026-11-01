@@ -116,6 +116,7 @@ public class RevealCommand extends Command {
         System.out.println("========================");
         System.out.println("       GAME OVER        ");
         System.out.println("========================");
+        deleteFinishedGameSaves();
     }
 
     /**
@@ -151,6 +152,16 @@ public class RevealCommand extends Command {
             System.out.println("========================");
             System.out.println("        VICTORY!        ");
             System.out.println("========================");
+            deleteFinishedGameSaves();
+        }
+    }
+
+    /**
+     * Removes this finished game's saves so it cannot be reloaded and played again.
+     */
+    private void deleteFinishedGameSaves() {
+        if (session != null) {
+            session.deleteFinishedGameSaves();
         }
     }
 

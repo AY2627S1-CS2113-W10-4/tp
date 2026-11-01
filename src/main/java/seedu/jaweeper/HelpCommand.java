@@ -13,7 +13,10 @@ public class HelpCommand extends Command {
         printEntry("f ROW COL", "Flag a cell.");
         printEntry("u ROW COL", "Remove a flag.");
         printEntry("board", "Display the current board.");
+        printEntry("hint", "Suggest a cell the numbers prove is safe.");
+        printEntry("undo", "Take back the last reveal, flag or unflag.");
         printEntry("new [easy|medium|hard]", "Start a new game (default: easy).");
+        printEntry("new custom ROWS COLS MINES", "Start a custom game (5-50 rows/columns).");
         System.out.println("Saved games:");
         printEntry("save NAME", "Save this game ('save' alone re-saves to the same name).");
         printEntry("load NAME", "Continue a saved game.");

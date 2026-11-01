@@ -64,6 +64,7 @@ public class SaveCommand extends Command {
             return;
         }
         tracker.markSaved(board, target);
+        session.linkSave(target);
         LOGGER.log(Level.INFO, "Game saved as {0}", target);
         System.out.println((isOverwrite ? "Overwrote save '" : "Game saved as '") + target + "'.");
     }

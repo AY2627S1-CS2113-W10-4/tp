@@ -66,6 +66,11 @@ public class FlagCommand extends Command {
         } else if (target.isFlagged) {
             logger.log(Level.INFO, "Flag rejected: cell (" + row + ", " + col + ") already flagged");
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is already flagged.");
+        } else if (board.countFlags() >= board.getTotalMines()) {
+            // One flag per mine: more would make the mine counter negative.
+            logger.log(Level.INFO, "Flag rejected: all " + board.getTotalMines() + " flags are placed");
+            System.out.println("All " + board.getTotalMines() + " flags are already placed."
+                    + " Remove one with 'u ROW COL' first.");
         } else {
             // @@author ProNoob116
             recordHistory(board);

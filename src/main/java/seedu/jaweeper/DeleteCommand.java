@@ -1,6 +1,7 @@
 package seedu.jaweeper;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,7 +51,17 @@ public class DeleteCommand extends Command {
             System.out.println("No save named '" + name + "'. Type 'saves' to see your saved games.");
             return;
         }
-        if (!confirmation.confirm(name)) {
+        byte[] contents;
+        try {
+            contents = store.readBytes(name);
+        } catch (IOException exception) {
+            confirmation.clear();
+            System.out.println("Could not read save '" + name + "': " + exception.getMessage());
+            return;
+        }
+        // The confirmation only covers the version the player was warned about; a save that was
+        // overwritten since then needs a fresh warning.
+        if (!confirmation.confirm(name, contents)) {
             System.out.println("This will permanently delete save '" + name + "'.");
             System.out.println("Type 'delete " + name + "' again to confirm.");
             return;
@@ -64,6 +75,7 @@ public class DeleteCommand extends Command {
         }
         LOGGER.log(Level.INFO, "Deleted save {0}", name);
         System.out.println("Deleted save '" + name + "'.");
+        session.unlinkSave(name);
         if (tracker.forgetSave(name)) {
             System.out.println("That was the save for your current game, which now counts as unsaved.");
         }
@@ -74,22 +86,33 @@ public class DeleteCommand extends Command {
      */
     public static final class Confirmation {
         private String pendingName;
+        private byte[] pendingContents;
 
         /**
          * Returns true if {@code name} was already warned about (and consumes that warning);
          * otherwise remembers {@code name} and returns false.
          */
         boolean confirm(String name) {
-            if (name.equals(pendingName)) {
-                pendingName = null;
+            return confirm(name, new byte[0]);
+        }
+
+        /**
+         * Returns true only if {@code name} was warned about while it had exactly these contents
+         * (and consumes that warning); otherwise remembers this name and version and returns false.
+         */
+        boolean confirm(String name, byte[] contents) {
+            if (name.equals(pendingName) && Arrays.equals(contents, pendingContents)) {
+                clear();
                 return true;
             }
             pendingName = name;
+            pendingContents = contents.clone();
             return false;
         }
 
         void clear() {
             pendingName = null;
+            pendingContents = null;
         }
     }
 }

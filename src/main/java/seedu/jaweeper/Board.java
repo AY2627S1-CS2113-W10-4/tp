@@ -1,7 +1,9 @@
 package seedu.jaweeper;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
@@ -247,9 +249,14 @@ public class Board {
      * Returns an independent copy of this board, including every cell.
      */
     public Board deepCopy() {
-        Board copy = new Board(rows, cols, totalMines);
-        copy.copyStateFrom(this);
-        return copy;
+        return new Board(this);
+    }
+
+    /**
+     * Builds an exact copy of {@code source} without generating a random board first.
+     */
+    private Board(Board source) {
+        copyStateFrom(source);
     }
     // @@author
 
@@ -277,36 +284,45 @@ public class Board {
         }
     }
 
+    /**
+     * Reveals the cell and, if it has no adjacent mines, keeps opening its neighbours.
+     * Uses an explicit stack rather than recursion, so large open areas (up to 99x99 boards
+     * from save files) cannot overflow the call stack.
+     */
     public void floodFill(int row, int col) {
-        if (row < 0 || row >= rows || col < 0 || col >= cols) {
-            return;
-        }
+        Deque<int[]> pending = new ArrayDeque<>();
+        pending.push(new int[]{row, col});
+        while (!pending.isEmpty()) {
+            int[] position = pending.pop();
+            int r = position[0];
+            int c = position[1];
+            if (r < 0 || r >= rows || c < 0 || c >= cols) {
+                continue;
+            }
+            Cell currentCell = grid[r][c];
+            if (currentCell.isRevealed || currentCell.isFlagged || currentCell.isMine) {
+                continue;
+            }
 
-        Cell currentCell = grid[row][col];
+            currentCell.isRevealed = true;
+            logger.finer("Revealed cell at (" + r + ", " + c + ")");
 
-        if (currentCell.isRevealed || currentCell.isFlagged || currentCell.isMine) {
-            return;
-        }
-
-        currentCell.isRevealed = true;
-        logger.finer("Revealed cell at (" + row + ", " + col + ")");
-
-        if (currentCell.adjacentMines > 0) {
-            return;
-        }
-
-        for (int dr = -1; dr <= 1; dr++) {
-            for (int dc = -1; dc <= 1; dc++) {
-                if (dr == 0 && dc == 0) {
-                    continue;
+            if (currentCell.adjacentMines > 0) {
+                continue;
+            }
+            for (int dr = -1; dr <= 1; dr++) {
+                for (int dc = -1; dc <= 1; dc++) {
+                    if (dr != 0 || dc != 0) {
+                        pending.push(new int[]{r + dr, c + dc});
+                    }
                 }
-                floodFill(row + dr, col + dc);
             }
         }
     }
 
     public void printBoard() {
-        int remainingMines = totalMines - countFlags();
+        // Flagging stops at the mine count, but a hand-edited save could hold extra flags.
+        int remainingMines = Math.max(0, totalMines - countFlags());
 
         System.out.println("Remaining Mines: " + remainingMines);
 

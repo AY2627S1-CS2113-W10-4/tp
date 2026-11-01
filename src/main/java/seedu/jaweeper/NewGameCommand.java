@@ -48,6 +48,7 @@ public class NewGameCommand extends Command {
         // Start/reset the timer and forget the previous game's undo history
         if (session != null) {
             session.clearBoardHistory();
+            session.forgetLinkedSaves();
             session.getGameTimer().start();
         }
 

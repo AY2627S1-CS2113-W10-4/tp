@@ -105,6 +105,7 @@ public class CustomGameCommand extends Command {
         board.copyStateFrom(new Board(rows, columns, mines));
         if (session != null) {
             session.clearBoardHistory();
+            session.forgetLinkedSaves();
             session.getGameTimer().start();
         }
         System.out.println("New custom game started (" + rows + "x" + columns + ", " + mines + " mines).");

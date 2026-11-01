@@ -95,6 +95,8 @@ before closing the application that way.
 
 Saves your unfinished game so you can continue it later, including the time already spent. Each profile has its own saves.
 
+When a game ends in a win or a loss, every save of that game is removed (Jaweeper prints `Removed save 'NAME' because this game is finished.`). Its result is already in your statistics, so it cannot be loaded and played again. Saves of other games are not affected.
+
 Format: `save NAME` or `save`
 
 * `NAME` has 1–30 letters, digits, `_` or `-`, with no spaces. It is not case-sensitive: `Trip` and `trip` are the same save.
@@ -437,7 +439,9 @@ Once the game is over, `r`, `f`, `u` and `hint` print `The game is over. Type 'n
 
 ### Flagging a cell: `f`
 
-Marks a hidden cell where you think a mine is. A flagged cell cannot be revealed by mistake. `Remaining Mines` goes down by 1 for each flag.
+Marks a hidden cell where you think a mine is. A flagged cell cannot be revealed by mistake. `Remaining Mines` goes down by 1 for each flag, whether or not the cell really holds a mine.
+
+You can place at most one flag per mine, so `Remaining Mines` never goes below 0. Once every flag is used, Jaweeper prints `All 10 flags are already placed. Remove one with 'u ROW COL' first.` (with your board's mine count).
 
 Format: `f ROW COL`
 
@@ -612,7 +616,7 @@ If there are none: `No saved games yet. Use 'save NAME' to create one.`
 
 ### Deleting a saved game: `delete`
 
-Permanently deletes a saved game. Type the same command twice to confirm.
+Permanently deletes a saved game. Type the same command twice to confirm. If the save is overwritten in between (for example by `save trip` again), Jaweeper warns again before deleting the newer version.
 
 Format: `delete NAME`
 
