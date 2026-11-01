@@ -14,7 +14,12 @@ public class GameTimer {
         this.isRunning = false;
     }
 
+    /**
+     * Starts timing a new game from zero. Time from any previous game is discarded;
+     * use {@link #resumeFrom(long)} to continue a saved game instead.
+     */
     public void start() {
+        this.elapsedMillis = 0;
         this.startTime = System.currentTimeMillis();
         this.isRunning = true;
     }

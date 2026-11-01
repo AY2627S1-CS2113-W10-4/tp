@@ -1,5 +1,8 @@
 package seedu.jaweeper;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -111,36 +114,70 @@ public class Board {
         isFirstMove = false;
 
         int minesBefore = countMines();
-        int minesToMove = 0;
 
+        // Clear the whole 3x3 block when there is room to move its mines elsewhere. A board too
+        // dense for that (only possible from a hand-made save) falls back to clearing just the
+        // clicked cell, instead of searching forever for free cells that do not exist.
+        int radius = 1;
+        if (freeCellsOutside(row, col, 1) < minesInside(row, col, 1)) {
+            radius = 0;
+        }
+
+        List<int[]> freeCells = new ArrayList<>();
+        int minesToMove = 0;
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (isInSafeArea(r, c, row, col) && grid[r][c].isMine) {
+                boolean inside = isInArea(r, c, row, col, radius);
+                if (inside && grid[r][c].isMine) {
                     grid[r][c].isMine = false;
                     minesToMove++;
+                } else if (!inside && !grid[r][c].isMine) {
+                    freeCells.add(new int[]{r, c});
                 }
             }
         }
+        assert freeCells.size() >= minesToMove : "There must be room for every relocated mine";
 
-        Random rand = new Random();
-        while (minesToMove > 0) {
-            int r = rand.nextInt(rows);
-            int c = rand.nextInt(cols);
-            if (!isInSafeArea(r, c, row, col) && !grid[r][c].isMine) {
-                grid[r][c].isMine = true;
-                minesToMove--;
-            }
+        Collections.shuffle(freeCells, new Random());
+        for (int i = 0; i < minesToMove; i++) {
+            int[] cell = freeCells.get(i);
+            grid[cell[0]][cell[1]].isMine = true;
         }
 
         calculateAdjacencies();
 
         assert countMines() == minesBefore : "Moving mines must not change total mine count";
-        assert grid[row][col].adjacentMines == 0 && !grid[row][col].isMine
-                : "First click must be safe and have no adjacent mines";
+        assert !grid[row][col].isMine : "First click must be safe";
+        assert radius == 0 || grid[row][col].adjacentMines == 0
+                : "First click must open a blank area when the board has room";
     }
 
-    private static boolean isInSafeArea(int r, int c, int clickRow, int clickCol) {
-        return Math.abs(r - clickRow) <= 1 && Math.abs(c - clickCol) <= 1;
+    private int minesInside(int clickRow, int clickCol, int radius) {
+        int count = 0;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (isInArea(r, c, clickRow, clickCol, radius) && grid[r][c].isMine) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int freeCellsOutside(int clickRow, int clickCol, int radius) {
+        int count = 0;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (!isInArea(r, c, clickRow, clickCol, radius) && !grid[r][c].isMine) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean isInArea(int r, int c, int clickRow, int clickCol, int radius) {
+        return Math.abs(r - clickRow) <= radius && Math.abs(c - clickCol) <= radius;
     }
 
     private int countMines() {
@@ -179,6 +216,33 @@ public class Board {
     }
 
     // @@author ProNoob116
+    /**
+     * Restores a snapshot of this same game into the existing grid, cell by cell.
+     * Unlike {@link #copyStateFrom(Board)}, the grid array keeps its identity, so features
+     * that recognise the game by its grid (such as {@link SaveTracker}) still see the same game.
+     * Falls back to a full copy if the snapshot has different dimensions.
+     */
+    public void restoreFrom(Board snapshot) {
+        assert snapshot != null : "Snapshot to restore must not be null";
+        if (snapshot.rows != rows || snapshot.cols != cols || grid.length != rows) {
+            copyStateFrom(snapshot);
+            return;
+        }
+        this.totalMines = snapshot.totalMines;
+        this.gameState = snapshot.gameState;
+        this.isFirstMove = snapshot.isFirstMove;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                Cell source = snapshot.grid[r][c];
+                Cell target = grid[r][c];
+                target.isMine = source.isMine;
+                target.isRevealed = source.isRevealed;
+                target.isFlagged = source.isFlagged;
+                target.adjacentMines = source.adjacentMines;
+            }
+        }
+    }
+
     /**
      * Returns an independent copy of this board, including every cell.
      */
@@ -330,7 +394,8 @@ public class Board {
 
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
-                if (grid[i][j] != null && grid[i][j].isRevealed) {
+                // A mine revealed on a loss is not a safe cell.
+                if (grid[i][j] != null && grid[i][j].isRevealed && !grid[i][j].isMine) {
                     revealedCount++;
                 }
             }

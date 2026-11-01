@@ -24,6 +24,7 @@ public class StatsClearCommand extends Command {
     public void execute(Board board) {
         Profile activeProfile = session.getActiveProfile();
         activeProfile.getStats().reset();
+        session.saveStats();
         System.out.println("Statistics have been successfully cleared for profile: " + activeProfile.getName());
     }
 }

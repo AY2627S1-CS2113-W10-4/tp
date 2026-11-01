@@ -114,9 +114,10 @@ public class CustomGameCommandTest {
                 Arguments.of("new custom 50 51 1", "cannot exceed 50 by 50"),
                 Arguments.of("new custom 10 10 0", "at least 1 mine"),
                 Arguments.of("new custom 10 10 -3", "at least 1 mine"),
-                Arguments.of("new custom 5 5 25", "fewer than the number of cells"),
-                Arguments.of("new custom 5 5 26", "fewer than the number of cells"),
-                Arguments.of("new custom 10 10 100", "fewer than the number of cells"),
+                Arguments.of("new custom 5 5 17", "allows at most 16 mines"),
+                Arguments.of("new custom 5 5 25", "allows at most 16 mines"),
+                Arguments.of("new custom 5 5 26", "allows at most 16 mines"),
+                Arguments.of("new custom 10 10 100", "allows at most 91 mines"),
                 Arguments.of("new custom x 5 1", "must be integers"),
                 Arguments.of("new custom 5 y 1", "must be integers"),
                 Arguments.of("new custom 5 5 z", "must be integers"),
@@ -130,7 +131,7 @@ public class CustomGameCommandTest {
     private static Stream<Arguments> validCustomGames() {
         return Stream.of(
                 Arguments.of(5, 5, 1),
-                Arguments.of(5, 5, 24),
+                Arguments.of(5, 5, 16),
                 Arguments.of(6, 7, 3),
                 Arguments.of(10, 12, 15),
                 Arguments.of(50, 50, 1)
@@ -142,7 +143,7 @@ public class CustomGameCommandTest {
                 Arguments.of(new String[]{"custom", "-5", "10", "1"}, "at least 5 by 5"),
                 Arguments.of(new String[]{"custom", "10", "100", "1"}, "cannot exceed 50 by 50"),
                 Arguments.of(new String[]{"custom", "8", "8", "0"}, "at least 1 mine"),
-                Arguments.of(new String[]{"custom", "8", "8", "64"}, "fewer than the number of cells"),
+                Arguments.of(new String[]{"custom", "8", "8", "64"}, "allows at most 55 mines"),
                 Arguments.of(new String[]{"custom", "8", "8"}, "Usage: new custom")
         );
     }

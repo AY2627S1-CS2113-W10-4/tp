@@ -41,10 +41,6 @@ public class FlagCommand extends Command {
         assert board != null : "Board must not be null";
         assert board.grid != null : "Board grid must be initialized before flagging";
 
-        // @@author ProNoob116
-        recordHistory(board);
-        // @@author
-
         logger.log(Level.FINE, "Flag requested at (" + row + ", " + col + ")");
 
         if (board.isGameOver()) {
@@ -71,6 +67,9 @@ public class FlagCommand extends Command {
             logger.log(Level.INFO, "Flag rejected: cell (" + row + ", " + col + ") already flagged");
             System.out.println("Cell (" + (row + 1) + ", " + (col + 1) + ") is already flagged.");
         } else {
+            // @@author ProNoob116
+            recordHistory(board);
+            // @@author
             target.isFlagged = true;
             assert target.isFlagged : "Cell should be flagged after flagging";
             assert !target.isRevealed : "A flagged cell must not be revealed";

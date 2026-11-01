@@ -33,6 +33,8 @@ public class Jaweeper {
                 return;
             }
             GameSession session = new GameSession(new Board(), profiles);
+            // The opening board is a real game, so time it like any game started with 'new'.
+            session.getGameTimer().start();
             run(input, session, createCoordinateCommands(session), createFeatureCommands(session));
         } catch (IOException exception) {
             LOGGER.log(Level.WARNING, "Could not load the profile registry", exception);

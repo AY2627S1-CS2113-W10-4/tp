@@ -10,6 +10,8 @@ import java.util.logging.Logger;
 public class CustomGameCommand extends Command {
     public static final int MIN_DIMENSION = 5;
     public static final int MAX_DIMENSION = 50;
+    /** Cells cleared around the first click: the clicked cell and its eight neighbours. */
+    public static final int SAFE_AREA_CELLS = 9;
     public static final String USAGE = "Usage: new custom ROWS COLS MINES";
 
     private static final Logger logger = Logger.getLogger(CustomGameCommand.class.getName());
@@ -63,9 +65,19 @@ public class CustomGameCommand extends Command {
         if (mineCount < 1) {
             throw new IllegalArgumentException("A custom board needs at least 1 mine.");
         }
-        if (mineCount >= rowCount * columnCount) {
-            throw new IllegalArgumentException("Mines must be fewer than the number of cells.");
+        int maxMines = maxMines(rowCount, columnCount);
+        if (mineCount > maxMines) {
+            throw new IllegalArgumentException("A " + rowCount + "x" + columnCount + " board allows at most "
+                    + maxMines + " mines, so the first reveal can open a clear 3x3 area.");
         }
+    }
+
+    /**
+     * Returns the largest mine count for a board of this size. The safe first click clears the
+     * 3x3 block around the clicked cell, so at least 9 cells must stay free of mines.
+     */
+    public static int maxMines(int rowCount, int columnCount) {
+        return rowCount * columnCount - SAFE_AREA_CELLS;
     }
 
     public int getRows() {
