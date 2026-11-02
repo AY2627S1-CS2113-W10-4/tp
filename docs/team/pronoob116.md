@@ -206,3 +206,7 @@ The object diagram below shows the objects after Step 3. The second flag is gone
 * **Alternative 2:** Each command knows how to undo itself.
   * Pros: Uses less memory.
   * Cons: Every command needs its own undo logic, which is easy to get wrong (e.g. flood fill).
+
+### AI Tool Declaration
+
+I used Gemini and Cursor to help format markdown paragraphs, sync my documentation with final team codebase logic, and refine my writing expressions. I am responsible for the content and quality of the submitted work.
