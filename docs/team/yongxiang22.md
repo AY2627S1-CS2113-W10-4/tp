@@ -19,15 +19,15 @@ Given below are my contributions to the project.
 * **Code contributed**: [RepoSense link](https://nus-cs2113-ay2627-s1.github.io/tp-dashboard/?search=yongxiang22)
 
 * **Enhancements to existing features**:
-    * Added `Board.restore`, which rebuilds a board from saved cells without placing random mines, and `GameTimer.resumeFrom`, which continues a saved game's timer (Pull request [\#42](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/42))
-    * Restructured `RevealCommand` with assertions, exceptions and logging (Pull request [\#29](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/29))
-    * Wrote 32 JUnit tests: 10 in `RevealCommandTest`, and 22 for saving and loading in `GameSaveCodecTest` and `SaveLoadCommandsTest`. They cover a round trip of a random 16×30 board, checksum tampering, truncated files and a full run through the application loop, using JUnit temporary folders (Pull requests [\#20](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/20), [\#42](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/42))
+    * Added `Board.restore`, which rebuilds a board from saved cells without placing random mines, and `GameTimer.resumeFrom`, which continues a saved game's timer
+    * Restructured `RevealCommand` with assertions, exceptions and logging
+    * Wrote 32 JUnit tests: 10 in `RevealCommandTest`, and 22 for saving and loading in `GameSaveCodecTest` and `SaveLoadCommandsTest`. They cover a round trip of a random 16×30 board, checksum tampering, truncated files and a full run through the application loop, using JUnit temporary folders
 
 * **Documentation**:
     * User Guide:
-        * Added documentation for the features `r`, `save` and `load`, where saves are kept, and the unsaved-progress warning on exit [\#58](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/58)
+        * Added documentation for the features `r`, `save` and `load`, where saves are kept, and the unsaved-progress warning on exit
     * Developer Guide:
-        * Added the "Saving a game" and "Loading a game" sections: the save-file format, the validation order, the unsaved-progress rule and the design alternatives [\#42](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/42)
+        * Added the "Saving a game" and "Loading a game" sections: the save-file format, the validation order, the unsaved-progress rule and the design alternatives
         * Added class, object and sequence diagrams for saving and loading, and an activity diagram for the unsaved-progress check
-        * Restructured the Developer Guide into the AB3 format and added its UML diagrams ([d93fc74](https://github.com/AY2627S1-CS2113-W10-4/tp/commit/d93fc746eb64b0ff013562f4bb38216d2bcf860b), [2e1b57c](https://github.com/AY2627S1-CS2113-W10-4/tp/commit/2e1b57c477da547ce0b038438bfe88308099c184))
-    * About Us: added my entry [\#9](https://github.com/AY2627S1-CS2113-W10-4/tp/pull/9)
+        * Restructured the Developer Guide into the AB3 format and added its UML diagrams
+    * About Us: added my entry
